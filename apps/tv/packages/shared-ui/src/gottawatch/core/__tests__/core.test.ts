@@ -275,3 +275,35 @@ describe('greeting uses the household zone, not the device clock zone', () => {
     expect(hourIn(t, 'Not/AZone')).toBe(t.getHours());
   });
 });
+
+import { askErrorCopy, askTraceLine, TV_ASK_CHIPS } from '../ask';
+
+describe('Ask on the TV', () => {
+  it('mock ask returns contract-valid picks from the feed, movie chip narrows to the movie', async () => {
+    const m = new MockApiClient({ latencyMs: [0, 0] });
+    const r = await m.ask('wcd_x', ['short']);
+    expect(r.picks.map((p) => p.title)).toEqual(['Kestrel Bay', 'The Quiet Orchard']);
+    expect((await m.ask('wcd_x', ['movie'])).picks.map((p) => p.title)).toEqual(['The Quiet Orchard']);
+    await m.markSeen('wcd_x', 'mock-r3');
+    expect((await m.ask('wcd_x', ['movie'])).picks).toEqual([]);
+  });
+  it('trace line names the model, what it read, the quote check and the time', async () => {
+    const r = await new MockApiClient({ latencyMs: [0, 0] }).ask('wcd_x', ['short']);
+    expect(askTraceLine(r)).toBe("Nemotron 3 Super on Nebius · read your circle's picks · skipped what you watched · checked 1 quote word for word · 3.0s");
+    expect(askTraceLine({ source: 'fallback', trace: [], picks: [] })).toBe('Ranked by friend count');
+  });
+  it('429 and offline get their own copy; chips are short enough for one row', async () => {
+    await expect(new MockApiClient({ latencyMs: [0, 0], scenario: 'ask-limit' }).ask('wcd_x', ['funny'])).rejects.toMatchObject({ status: 429 });
+    expect(askErrorCopy(new ApiFailure('retryable', 'HTTP 429', 429))).toMatch(/few minutes/);
+    expect(askErrorCopy(new ApiFailure('retryable', 'Network error'))).toMatch(/connection/);
+    expect(TV_ASK_CHIPS.reduce((n, c) => n + c.label.length, 0)).toBeLessThan(50);
+  });
+  it('live client posts chips to /ask with a longer timeout', async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({ answer: 'x', picks: [], source: 'fallback', trace: [] }), { status: 200 }));
+    const r = await new LiveApiClient('', f as never).ask('wcd_x', ['light']);
+    expect(r.source).toBe('fallback');
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/ask');
+    expect(JSON.parse(String(init.body))).toEqual({ query: '', chips: ['light'] });
+  });
+});

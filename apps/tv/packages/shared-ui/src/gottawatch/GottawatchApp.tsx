@@ -14,6 +14,8 @@ import { HandoffScreen } from './screens/HandoffScreen';
 import { AboutScreen } from './screens/AboutScreen';
 import { ActionsSheet } from './screens/ActionsSheet';
 import { WatchedScreen } from './screens/WatchedScreen';
+import { AskScreen, type AskState } from './screens/AskScreen';
+import { groupByTitle } from './core/home';
 import type { ToastState } from './screens/Toast';
 import { INFO_TOAST_MS, UNDO_TOAST_MS } from './core/home';
 import { useHomeData } from './screens/useHomeData';
@@ -24,7 +26,8 @@ type Route =
   | { k: 'pairing'; banner?: string; intro: boolean }
   | { k: 'paired' }
   | { k: 'home' }
-  | { k: 'handoff'; card: TitleCard }
+  | { k: 'handoff'; card: TitleCard; from?: 'ask' }
+  | { k: 'ask' }
   | { k: 'about'; from: 'home' | 'pairing' }
   | { k: 'watched' };
 
@@ -217,6 +220,8 @@ function PairedArea({ config, api, token, session, route, setRoute, sheet, setSh
     setToast({ text: ok ? 'Back in your list' : "Couldn't undo. Try again from Watched." });
   }, [toast, data, setToast]);
   const homeData = { ...data, markSeen };
+  const [askState, setAskState] = useState<AskState>({ k: 'idle' });
+  const cards = React.useMemo(() => groupByTitle(data.items), [data.items]);
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {onHome && (
@@ -235,6 +240,7 @@ function PairedArea({ config, api, token, session, route, setRoute, sheet, setSh
           onAbout={() => setRoute({ k: 'about', from: 'home' })}
           onMenu={(card) => setSheet(card)}
           onWatched={() => setRoute({ k: 'watched' })}
+          onAsk={() => setRoute({ k: 'ask' })}
           toast={toast}
           onUndo={() => void undo()}
           onDismissToast={() => setToast(null)}
@@ -252,7 +258,25 @@ function PairedArea({ config, api, token, session, route, setRoute, sheet, setSh
           }}
         />
       )}
-      {route.k === 'handoff' && <HandoffScreen card={route.card} config={config} active onClose={() => setRoute({ k: 'home' })} />}
+      {route.k === 'handoff' && (
+        <HandoffScreen card={route.card} config={config} active onClose={() => setRoute(route.from === 'ask' ? { k: 'ask' } : { k: 'home' })} />
+      )}
+      {route.k === 'ask' && (
+        <AskScreen
+          api={api}
+          token={token}
+          active
+          cards={cards}
+          state={askState}
+          setState={setAskState}
+          onBack={() => {
+            setRestoreKey('cta');
+            setRoute({ k: 'home' });
+          }}
+          onOpen={(card) => setRoute({ k: 'handoff', card, from: 'ask' })}
+          onUnauthorized={onUnauthorized}
+        />
+      )}
       {route.k === 'watched' && (
         <WatchedScreen
           api={api}

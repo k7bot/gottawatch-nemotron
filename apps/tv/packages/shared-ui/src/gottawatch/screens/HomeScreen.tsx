@@ -35,6 +35,7 @@ interface Props {
   onAbout: () => void;
   onMenu: (card: TitleCard) => void;
   onWatched: () => void;
+  onAsk?: () => void;
   toast?: ToastState | null;
   onUndo: () => void;
   onDismissToast: () => void;
@@ -43,7 +44,7 @@ interface Props {
 
 const SPOTLIGHT_DEBOUNCE_MS = 250;
 
-export function HomeScreen({ config, data, householdName, timezone, baseline, active, onOpen, onAbout, onMenu, onWatched, toast, onUndo, onDismissToast, restoreKey }: Props) {
+export function HomeScreen({ config, data, householdName, timezone, baseline, active, onOpen, onAbout, onMenu, onWatched, onAsk, toast, onUndo, onDismissToast, restoreKey }: Props) {
   const now = Date.now();
   const cards = useMemo(() => groupByTitle(data.items), [data.items]);
   const hero = useMemo(() => chooseHero(cards, data.tonight), [cards, data.tonight]);
@@ -159,6 +160,12 @@ export function HomeScreen({ config, data, householdName, timezone, baseline, ac
               <Text style={[type.label, { marginRight: px(24) }]}>{greeting(new Date(now), timezone)}</Text>
               <SpatialNavigationNode orientation="horizontal">
                 <View style={{ flexDirection: 'row' }}>
+                  {onAsk ? (
+                    <>
+                      <Button label="Ask" variant="quiet" onSelect={onAsk} onFocus={() => { atCta.current = false; leftUndo(); setFocusedKey(null); }} />
+                      <View style={{ width: px(16) }} />
+                    </>
+                  ) : null}
                   <Button label="Watched" variant="quiet" onSelect={onWatched} onFocus={() => { atCta.current = false; leftUndo(); setFocusedKey(null); }} />
                   <View style={{ width: px(16) }} />
                   <Button label="About" variant="quiet" onSelect={onAbout} onFocus={() => { atCta.current = false; leftUndo(); setFocusedKey(null); }} />

@@ -1,7 +1,7 @@
 // In-app fake API (ADR-0007): same ApiClient interface, fixtures validated against the contract,
 // realistic latency + real-timestamp pairing expiry, scenario-based error injection.
 // Fixtures use only the made-up demo catalog and personas (plan §7). DEV BUILDS ONLY (config.ts).
-import { FeedResponse, PAIR_CODE_ALPHABET, SeenHistoryResponse, TonightResponse } from '@gottawatch/contract';
+import { AskResponse, FeedResponse, PAIR_CODE_ALPHABET, SeenHistoryResponse, TonightResponse } from '@gottawatch/contract';
 import { ApiFailure, type ApiClient, type FeedItem, type Me, type PairStart, type PairStatus, type SeenItem, type Tonight } from './api';
 
 export type MockScenario =
@@ -15,9 +15,11 @@ export type MockScenario =
   | 'server-error' // /feed 500
   | 'handoff' // same data as default (kept for old screenshot URLs)
   | 'history' // two titles already watched (Watched screen)
-  | 'history-error'; // GET /seen fails
+  | 'history-error' // GET /seen fails
+  | 'ask-limit' // POST /ask 429
+  | 'ask-error'; // POST /ask 500
 
-export const MOCK_SCENARIOS: MockScenario[] = ['default', 'stub', 'fallback', 'nopick', 'empty', 'offline', 'unpaired', 'server-error', 'handoff', 'history', 'history-error'];
+export const MOCK_SCENARIOS: MockScenario[] = ['default', 'stub', 'fallback', 'nopick', 'empty', 'offline', 'unpaired', 'server-error', 'handoff', 'history', 'history-error', 'ask-limit', 'ask-error'];
 
 export interface MockOptions {
   scenario?: string;
@@ -190,6 +192,36 @@ export class MockApiClient implements ApiClient {
       .sort((a, b) => b[1].at - a[1].at)
       .map(([, v]) => ({ ...this.items.find((i) => i.id === v.recId)!, seenAt: new Date(v.at).toISOString() }));
     return SeenHistoryResponse.parse({ items: live.slice(0, limit) }).items;
+  }
+
+  async ask(token: string, chips: string[]): Promise<AskResponse> {
+    await this.wait();
+    await new Promise((r) => setTimeout(r, this.latency[0] * 2)); // the agent is slower than a list call
+    this.checkToken(token);
+    if (this.scenario === 'ask-limit') throw new ApiFailure('retryable', 'HTTP 429 (mock)', 429);
+    if (this.scenario === 'ask-error') throw new ApiFailure('retryable', 'HTTP 500 (mock)', 500);
+    const left = this.items.filter((i) => !this.seenTitles.has(i.title));
+    const has = (t: string) => left.find((i) => i.title === t);
+    const kb = has('Kestrel Bay'), qo = has('The Quiet Orchard');
+    const picks = chips.includes('movie')
+      ? qo ? [{ recId: qo.id, title: qo.title, reason: 'Maya sent it, and it is the one movie in your list.', quotes: [], from: ['Maya'] }] : []
+      : [
+          ...(kb ? [{ recId: kb.id, title: kb.title, reason: 'Priya and Sam both sent it, and the episodes are only 40 minutes.', quotes: ['start at ep 2'], from: ['Priya', 'Sam'], runtime: 40 }] : []),
+          ...(qo ? [{ recId: qo.id, title: qo.title, reason: 'If you want one long story instead, Maya says this is it.', quotes: [], from: ['Maya'] }] : []),
+        ];
+    return AskResponse.parse({
+      answer: picks.length ? `${picks[0]!.title} is your best bet tonight.` : 'Nothing in your list fits that. Try another mood.',
+      picks,
+      source: 'nemotron-agent',
+      model: 'nvidia/nemotron-3-super-120b-a12b',
+      trace: [
+        { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: '2 tool call(s)', ms: 1300 },
+        { kind: 'tool', label: 'get_friend_picks', detail: '{}', ms: 2 },
+        { kind: 'tool', label: 'get_watch_history', detail: '{}', ms: 1 },
+        { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: 'answer', ms: 1700 },
+        { kind: 'check', label: 'grounding', detail: `${picks.length} pick(s) grounded` },
+      ],
+    });
   }
 
   /** Test/dev helper: simulate a friend sending a rec. */

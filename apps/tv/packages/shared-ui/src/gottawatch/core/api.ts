@@ -1,6 +1,7 @@
 // One ApiClient interface, two implementations (ADR-0007 guardrail 1). Every response is
 // validated against @gottawatch/contract (guardrail 2), so contract drift shows up as an error.
 import {
+  AskResponse,
   FeedResponse,
   MeResponse,
   PairStartResponse,
@@ -60,6 +61,8 @@ export interface ApiClient {
   unmarkSeen(token: string, recId: string): Promise<void>;
   /** Watched history, newest first, one per title. */
   seenHistory(token: string, limit?: number): Promise<SeenItem[]>;
+  /** Ask Gottawatch (Nemotron on Nebius): picks from the household's friend recs for a mood. */
+  ask(token: string, chips: C.AskChip[], query?: string): Promise<C.AskResponse>;
 }
 
 type FetchFn = typeof fetch;
@@ -74,13 +77,13 @@ export class LiveApiClient implements ApiClient {
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
     schema: Schema<T> | null,
-    opts: { token?: string; body?: unknown } = {},
+    opts: { token?: string; body?: unknown; timeoutMs?: number } = {},
   ): Promise<T | null> {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (opts.token) headers.authorization = `Bearer ${opts.token}`;
     if (opts.body !== undefined) headers['content-type'] = 'application/json';
     const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
-    const timer = ctrl ? setTimeout(() => ctrl.abort(), this.timeoutMs) : undefined;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), opts.timeoutMs ?? this.timeoutMs) : undefined;
     let res: Response;
     try {
       res = await this.fetchFn(this.baseUrl + path, {
@@ -145,6 +148,10 @@ export class LiveApiClient implements ApiClient {
   }
   async unmarkSeen(token: string, recId: string) {
     await this.request('DELETE', `/recommendations/${encodeURIComponent(recId)}/seen`, SeenResponse, { token });
+  }
+  /** The agent has a 12s server budget, so allow 20s. */
+  async ask(token: string, chips: C.AskChip[], query = '') {
+    return this.must(await this.request('POST', '/ask', AskResponse, { token, body: { query, chips }, timeoutMs: Math.max(this.timeoutMs, 20000) }), 'ask');
   }
   async seenHistory(token: string, limit = 50) {
     return this.must(await this.request('GET', `/seen?limit=${limit}`, SeenHistoryResponse, { token }), 'seen').items;

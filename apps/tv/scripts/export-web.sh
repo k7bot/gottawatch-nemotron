@@ -13,7 +13,7 @@ python3 - "$TMP/index.html" "$HINT" <<'PY'
 import sys
 p, hint = sys.argv[1], sys.argv[2]
 s = open(p).read()
-s = s.replace('<meta httpEquiv=', '<meta http-equiv=').replace('<title>Gottawatch</title>', '<title>Gottawatch for Fire TV (browser preview)</title>')
+s = s.replace('<meta httpEquiv=', '<meta http-equiv=').replace('<title>Gottawatch</title>', '<title>Gottawatch for Fire TV (browser preview)</title>\n    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />')
 s = s.replace('</body>', hint + '\n</body>', 1)
 open(p, 'w').write(s)
 PY
