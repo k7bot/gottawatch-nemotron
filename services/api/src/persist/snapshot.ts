@@ -5,7 +5,7 @@
 // Writes are debounced (default 2 s after the last change) and flushed on SIGTERM/SIGINT, so a
 // container restart loses at most the last couple of seconds. One writer only: run one replica.
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { MemoryStore, type Store } from "../lib/store.js";
 
 export const SNAPSHOT_VERSION = 1;
@@ -16,6 +16,8 @@ export interface SnapshotBackend {
   /** Returns undefined when nothing has been saved yet. */
   load(): Promise<string | undefined>;
   save(body: string): Promise<void>;
+  /** Writes a small private object/file next to the snapshot (e.g. seed-links.txt). */
+  saveSibling?(name: string, body: string): Promise<void>;
 }
 
 // --- serialization ------------------------------------------------------------------------------
@@ -84,6 +86,10 @@ export function fileBackend(path: string): SnapshotBackend {
       await writeFile(tmp, body, { mode: 0o600 });
       await rename(tmp, path); // atomic on one filesystem
     },
+    async saveSibling(name, body) {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(join(dirname(path), name), body, { mode: 0o600 });
+    },
   };
 }
 
@@ -98,6 +104,7 @@ export function s3Backend(client: ObjectClient, bucket: string, key: string): Sn
     label: `s3://${bucket}/${key}`,
     load: () => client.get(bucket, key),
     save: (body) => client.put(bucket, key, body),
+    saveSibling: (name, body) => client.put(bucket, key.includes("/") ? key.replace(/[^/]+$/, name) : name, body),
   };
 }
 

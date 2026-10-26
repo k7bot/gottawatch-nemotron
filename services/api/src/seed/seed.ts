@@ -124,12 +124,13 @@ export function buildSeed(opts: SeedOptions, now: Date): SeedPlan {
 /**
  * Writes the plan. Re-runnable: households/users/friendships are upserts; viewer households'
  * recs + picks are cleared and rewritten (fresh dates, Seen reset). Profile tokens rotate
- * (old hash deleted) unless `keepTokens[userId]` matches the stored hash. Paired TVs stay paired.
+ * (old hash deleted) unless `keepTokens[userId]` matches the stored hash, or `preserveTokens` is set
+ * (scheduled demo refresh: every existing token stays valid and only new users get a link). Paired TVs stay paired.
  */
 export async function applySeed(
   store: Store,
   plan: SeedPlan,
-  opts: { keepTokens?: Record<string, string> } = {},
+  opts: { keepTokens?: Record<string, string>; preserveTokens?: boolean } = {},
 ): Promise<{ links: SeedLink[]; cleared: number }> {
   // Merge over what's stored so a reseed never drops fields the plan doesn't set (e.g. Kiran's sign-in email).
   for (const h of plan.households) await store.putHousehold({ ...(await store.getHousehold(h.id)), ...h });
@@ -137,6 +138,10 @@ export async function applySeed(
   const links: SeedLink[] = [];
   for (const u of plan.users) {
     const existing = await store.getUser(u.id);
+    if (opts.preserveTokens && existing?.tokenHash) {
+      await store.putUser({ ...existing, ...u, tokenHash: existing.tokenHash });
+      continue;
+    }
     const kept = opts.keepTokens?.[u.id];
     const keep = !!kept && !!existing?.tokenHash && hashToken(kept) === existing.tokenHash;
     const token = keep ? kept! : newToken("profile");
