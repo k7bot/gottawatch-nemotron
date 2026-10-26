@@ -117,7 +117,23 @@ export const slugify = (t: string) =>
     .normalize('NFKD')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-const ART = new Set(['kestrel-bay', 'the-quiet-orchard', 'saltwater-static']);
+// Bundled demo-catalog art (tools/poster-gen writes apps/web/public/art/<slug>.jpg).
+const ART = new Set([
+  'kestrel-bay',
+  'the-quiet-orchard',
+  'saltwater-static',
+  'small-hours-bakery',
+  'lanternfish-and-co',
+  'ninety-seconds-to-orbit',
+  'the-paper-comet',
+  'night-desk-at-hollow-pines',
+  'copper-and-thistle',
+  'the-marigold-line',
+  'fjordlight',
+  'the-birdie-rule',
+  'below-quarry-lake',
+  'the-lighthouse-supper-club',
+]);
 export const posterUrl = (title: string, poster?: string) => poster ?? (ART.has(slugify(title)) ? `/art/${slugify(title)}.jpg` : '/art/fallback.jpg');
 export const hasOwnArt = (title: string, poster?: string) => !!poster || ART.has(slugify(title));
 

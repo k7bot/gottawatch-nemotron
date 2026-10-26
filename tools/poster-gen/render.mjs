@@ -24,6 +24,17 @@ const TITLES = [
   { slug: "kestrel-bay", title: "Kestrel Bay", mood: "tide", motif: "horizon" },
   { slug: "the-quiet-orchard", title: "The Quiet Orchard", mood: "orchard", motif: "dots" },
   { slug: "saltwater-static", title: "Saltwater Static", mood: "static", motif: "waves" },
+  { slug: "small-hours-bakery", title: "Small Hours Bakery", mood: "ember", motif: "dots" },
+  { slug: "lanternfish-and-co", title: "Lanternfish and Co", mood: "tide", motif: "dots" },
+  { slug: "ninety-seconds-to-orbit", title: "Ninety Seconds to Orbit", mood: "frost", motif: "waves" },
+  { slug: "the-paper-comet", title: "The Paper Comet", mood: "dusk", motif: "horizon" },
+  { slug: "night-desk-at-hollow-pines", title: "Night Desk at Hollow Pines", mood: "static", motif: "dots" },
+  { slug: "copper-and-thistle", title: "Copper and Thistle", mood: "ember", motif: "split" },
+  { slug: "the-marigold-line", title: "The Marigold Line", mood: "dusk", motif: "waves" },
+  { slug: "fjordlight", title: "Fjordlight", mood: "frost", motif: "horizon" },
+  { slug: "the-birdie-rule", title: "The Birdie Rule", mood: "orchard", motif: "horizon" },
+  { slug: "below-quarry-lake", title: "Below Quarry Lake", mood: "tide", motif: "waves" },
+  { slug: "the-lighthouse-supper-club", title: "The Lighthouse Supper Club", mood: "ember", motif: "horizon" },
   // Generic fallback (unknown titles, broken poster URLs): no title in the art; the app overlays it.
   { slug: "fallback", title: "Gottawatch", mood: "dusk", motif: "rings", noTitle: true },
 ];
@@ -47,4 +58,5 @@ for (const t of TITLES) {
   shoot(`${t.slug}-backdrop`, poster(t.title, 1920, 1080, o), 1920, 1080);
 }
 
-execFileSync("python3", [path.join(here, "finish.py"), tmp, assets, JSON.stringify(TITLES)], { stdio: "inherit" });
+const web = path.join(repo, "apps/web/public/art");
+execFileSync("python3", [path.join(here, "finish.py"), tmp, assets, JSON.stringify(TITLES), web], { stdio: "inherit" });

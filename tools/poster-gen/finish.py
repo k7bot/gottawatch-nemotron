@@ -2,6 +2,7 @@
 import json, sys
 from PIL import Image
 tmp, out, titles = sys.argv[1], sys.argv[2], json.loads(sys.argv[3])
+web = sys.argv[4] if len(sys.argv) > 4 else None  # phone PWA thumbnails (220x330 JPEG)
 TEXT = (0xF4, 0xF1, 0xEA)
 def lum(rgb):
     def c(v):
@@ -17,6 +18,8 @@ for t in titles:
     s = t["slug"]
     Image.open(f"{tmp}/{s}-poster.png").convert("RGB").save(f"{out}/{s}-poster.png", optimize=True)
     Image.open(f"{tmp}/{s}-backdrop.png").convert("RGB").resize((960, 540), Image.LANCZOS).save(f"{out}/{s}-backdrop.jpg", quality=82, optimize=True)
+    if web:
+        Image.open(f"{tmp}/{s}-poster.png").convert("RGB").resize((220, 330), Image.LANCZOS).save(f"{web}/{s}.jpg", quality=85, optimize=True)
     if t.get("noTitle"):
         continue
     # Title sits in the bottom ~35% (recipe: baseline at 80% height). Worst case = 95th-percentile

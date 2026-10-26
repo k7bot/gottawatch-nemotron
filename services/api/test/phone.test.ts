@@ -89,8 +89,8 @@ describe("seed keeps member/device rows and writes demo Sent (PT-4)", () => {
     await applySeed(store, buildSeed({}, new Date()));
     expect(await store.listHomeDevices("hh-kiran")).toHaveLength(1);
     const sent = await store.listSent("u-priya", 10);
-    expect(sent).toHaveLength(1);
-    expect(sent[0]!.toNames).toEqual(["Kiran", "Judge 1"]);
-    expect(await store.listSent("u-sam", 10)).toHaveLength(1);
+    expect(sent).toHaveLength(5);
+    expect(sent.every((s) => s.toNames.join() === "Kiran,Judge 1")).toBe(true);
+    expect(await store.listSent("u-sam", 10)).toHaveLength(5);
   });
 });

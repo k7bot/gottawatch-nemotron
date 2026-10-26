@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { FeedResponse, FriendsResponse, TonightResponse } from "@gottawatch/contract";
-import { applySeed, buildSeed } from "../src/seed/seed.js";
+import { applySeed, buildSeed, DEMO_RECS } from "../src/seed/seed.js";
 import { MemoryStore } from "../src/lib/store.js";
 import { makeAppHandler, makeTonightHandler } from "../src/handlers/routes.js";
 import { makeAuthorizer } from "../src/handlers/authorizer.js";
@@ -25,14 +25,20 @@ describe("seed (API-12)", () => {
     expect(plan.viewerHouseholdIds).toEqual(["hh-kiran", "hh-judge-1", "hh-judge-2"]);
     expect(plan.friendships).toContainEqual(["u-kiran", "u-priya"]);
     expect(plan.friendships).not.toContainEqual(["u-priya", "u-sam"]); // friends of Kiran only (OQ-18 proposal)
-    expect(plan.recs).toHaveLength(9);
+    expect(plan.recs).toHaveLength(3 * DEMO_RECS.length);
     for (const r of plan.recs) {
       const age = clock.now().getTime() - Date.parse(r.createdAt);
       expect(age).toBeGreaterThan(0);
       expect(age).toBeLessThan(7 * DAY_MS); // inside both windows
       expect(r.recId.startsWith(recIdLowerBound(new Date(r.createdAt)))).toBe(true); // recId from createdAt
-      expect(r.seen).toBe(false);
+      expect(r.genres?.length).toBeGreaterThan(0); // demo catalog metadata is copied for Ask
+      if (r.seen) expect(Date.parse(r.seenAt!)).toBeGreaterThan(Date.parse(r.createdAt));
     }
+    const kiran = plan.recs.filter((r) => r.householdId === "hh-kiran");
+    expect(kiran.filter((r) => r.seen).map((r) => r.title)).toEqual(["Below Quarry Lake", "The Lighthouse Supper Club"]);
+    expect(new Set(kiran.filter((r) => !r.seen).map((r) => r.title)).size).toBeGreaterThanOrEqual(10); // enough for the Ask demo
+    expect(kiran.filter((r) => !r.seen && r.note).length).toBeGreaterThanOrEqual(10);
+    expect(kiran.some((r) => r.title === "Saltwater Static")).toBe(false); // live send in the video
   });
 
   it("prefixes every id (throwaway seeds for smoke tests)", () => {
@@ -59,7 +65,10 @@ describe("seed (API-12)", () => {
 
     const dev = { kind: "device" as const, subjectId: "tvA1b2C3d4E5f6G7h8I9j0K1", householdId: "hh-kiran" };
     const feed = FeedResponse.parse(body(await app(event("GET /feed", { auth: dev }))));
-    expect(feed.items.map((i) => i.title)).toEqual(["Kestrel Bay", "Kestrel Bay", "The Quiet Orchard"]);
+    expect(feed.items.map((i) => i.title)).toEqual([
+      "Kestrel Bay", "Small Hours Bakery", "Lanternfish and Co", "Ninety Seconds to Orbit", "Kestrel Bay", "The Paper Comet",
+      "Small Hours Bakery", "Night Desk at Hollow Pines", "The Quiet Orchard", "Copper and Thistle", "The Marigold Line", "Fjordlight", "The Birdie Rule",
+    ]);
     const t = TonightResponse.parse(body(await makeTonightHandler(() => deps)(event("GET /tonight", { auth: dev }))));
     expect(t).toMatchObject({ title: "Kestrel Bay", source: "stub" });
   });
@@ -79,9 +88,10 @@ describe("seed (API-12)", () => {
     const second = await applySeed(store, buildSeed({ judges: 1 }, clock.now()), { keepTokens: { "u-kiran": kiranOld } });
 
     const feed = body(await app(event("GET /feed", { auth: dev }))).items;
-    expect(feed).toHaveLength(3);
+    const unseen = DEMO_RECS.filter((d) => d.seenHoursAgo === undefined).length;
+    expect(feed).toHaveLength(unseen);
     expect(feed.every((i: { createdAt: string }) => clock.now().getTime() - Date.parse(i.createdAt) < 7 * DAY_MS)).toBe(true);
-    expect(store.recs.size).toBe(6); // no duplicates: 3 per viewer household
+    expect(store.recs.size).toBe(2 * DEMO_RECS.length); // no duplicates: one set per viewer household
     const t = await makeTonightHandler(() => deps)(event("GET /tonight", { auth: dev }));
     expect(t.statusCode).toBe(200);
 

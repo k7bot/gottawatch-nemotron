@@ -38,13 +38,30 @@ export interface SeedLink {
 }
 
 // Demo recs sent to every viewer household, relative to "now" so they stay inside the
-// 7-day fallback and 14-day candidate windows (MF-6). Only Priya's Kestrel Bay note is
-// from the plan (§7 video script); there are deliberately no other notes.
+// 7-day fallback and 14-day candidate windows (MF-6). Priya's Kestrel Bay note is from the plan
+// (§7 video script); every other note is DEMO FILLER written for the Ask Gottawatch demo, so the
+// agent has real friend quotes to ground "short", "funny", "intense", "together" etc. in.
+// Kestrel Bay stays the only title whose newest send is the most recent 2-sender one, so the stub
+// pick (most senders, then newest) is still Kestrel Bay. `seenHoursAgo` = already watched (history).
 // Seed services use the generic demo ids only (ADR-0012): no real brand in demo data or the video.
-const DEMO_RECS: { from: "priya" | "sam" | "maya"; titleId: string; hoursAgo: number; note?: string; service: "app_a" | "app_b" | null }[] = [
+type DemoRec = { from: "priya" | "sam" | "maya"; titleId: string; hoursAgo: number; note?: string; service: "app_a" | "app_b" | null; seenHoursAgo?: number };
+export const DEMO_RECS: readonly DemoRec[] = [
   { from: "priya", titleId: "kestrel-bay", hoursAgo: 3, note: "40-min episodes, start at ep 2", service: "app_a" },
   { from: "sam", titleId: "kestrel-bay", hoursAgo: 26, service: "app_a" },
-  { from: "maya", titleId: "the-quiet-orchard", hoursAgo: 50, service: "app_b" },
+  { from: "maya", titleId: "the-quiet-orchard", hoursAgo: 50, note: "Bring tissues. The last twenty minutes wrecked me.", service: "app_b" },
+  { from: "sam", titleId: "small-hours-bakery", hoursAgo: 5, note: "22-minute episodes, perfect when you're wiped out", service: "app_b" },
+  { from: "maya", titleId: "small-hours-bakery", hoursAgo: 30, note: "I laughed out loud on the train", service: "app_b" },
+  { from: "priya", titleId: "lanternfish-and-co", hoursAgo: 8, note: "The otter subplot is the funniest thing on TV", service: "app_a" },
+  { from: "sam", titleId: "ninety-seconds-to-orbit", hoursAgo: 20, note: "Edge-of-your-seat. Big screen, sound up.", service: null },
+  { from: "maya", titleId: "the-paper-comet", hoursAgo: 28, note: "Great one to watch together, kids or not", service: "app_b" },
+  { from: "priya", titleId: "night-desk-at-hollow-pines", hoursAgo: 44, note: "Creepy but cozy. Maybe not alone after midnight.", service: "app_a" },
+  { from: "sam", titleId: "copper-and-thistle", hoursAgo: 60, note: "Slow first episode, then it's brilliant", service: "app_b" },
+  { from: "maya", titleId: "the-marigold-line", hoursAgo: 72, note: "Light and silly, exactly what a Friday needs", service: null },
+  { from: "priya", titleId: "fjordlight", hoursAgo: 96, note: "The calmest thing I've watched all year", service: "app_a" },
+  { from: "sam", titleId: "the-birdie-rule", hoursAgo: 120, service: null },
+  // Already watched (Watched history; the Ask agent reads it for taste).
+  { from: "priya", titleId: "below-quarry-lake", hoursAgo: 140, note: "You'll guess the twist and still love it", service: "app_a", seenHoursAgo: 48 },
+  { from: "maya", titleId: "the-lighthouse-supper-club", hoursAgo: 150, service: "app_b", seenHoursAgo: 96 },
   // Saltwater Static is deliberately NOT seeded: it is the live send in shot 2 of the demo video
   // (docs/design/demo-video-shot-list.md), so it must arrive on the TV as a new card.
 ];
@@ -92,9 +109,12 @@ export function buildSeed(opts: SeedOptions, now: Date): SeedPlan {
         titleId: title.id,
         mediaType: title.mediaType,
         title: title.title,
+        ...(title.year !== undefined ? { year: title.year } : {}),
         ...(title.runtime !== undefined ? { runtime: title.runtime } : {}),
+        ...(title.genres?.length ? { genres: title.genres } : {}),
         createdAt: createdAt.toISOString(),
-        seen: false,
+        seen: d.seenHoursAgo !== undefined,
+        ...(d.seenHoursAgo !== undefined ? { seenAt: new Date(now.getTime() - d.seenHoursAgo * HOUR).toISOString() } : {}),
       });
     }
   }
