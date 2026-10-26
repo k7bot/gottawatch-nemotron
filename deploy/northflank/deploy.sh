@@ -33,13 +33,18 @@ echo "2/4 GitHub access to k7bot/gottawatch-nemotron"
 access=$("$NF" get service repository-access --projectId "$PROJECT" --quiet -o json \
   --input '{"projectUrl":"https://github.com/k7bot/gottawatch-nemotron","projectType":"github"}' 2>&1 || true)
 if ! echo "$access" | grep -q '"accessible": *true'; then
-  echo "    no access yet: link GitHub in Northflank (Account settings > Git > GitHub) and allow k7bot/gottawatch-nemotron."
-  exit 2
+  if [ "${SKIP_ACCESS_CHECK:-0}" = "1" ]; then
+    echo "    precheck says no access; SKIP_ACCESS_CHECK=1, trying anyway (the precheck can miss team Git links)"
+  else
+    echo "    no access yet: link GitHub in Northflank (team settings > Git > GitHub) and allow k7bot/gottawatch-nemotron."
+    echo "    If the UI already shows the repo linked, rerun with SKIP_ACCESS_CHECK=1."
+    exit 2
+  fi
 fi
 
 echo "3/4 secret group $SECRET (NEBIUS_API_KEY)"
 if exists get secret --projectId "$PROJECT" --secretId "$SECRET"; then echo "    exists (not overwritten)"; else
-  tmp=$(mktemp); chmod 600 "$tmp"; trap 'rm -f "$tmp"' EXIT
+  tmp=$(mktemp --suffix=.json); chmod 600 "$tmp"; trap 'rm -f "$tmp"' EXIT
   node -e 'process.stdout.write(JSON.stringify({name:process.argv[1],description:"Nebius Token Factory key",type:"secret",secretType:"environment",priority:10,secrets:{variables:{NEBIUS_API_KEY:process.env.NEBIUS_API_KEY}}}))' "$SECRET" >"$tmp"
   nf create secret --projectId "$PROJECT" --file "$tmp"
   rm -f "$tmp"
