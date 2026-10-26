@@ -6,7 +6,7 @@ Friends recommend titles from their phones; your TV shows a lean-back living-roo
 
 ## Build and run
 
-Prerequisites: Node 20+ (CI uses 22), npm, and for the TV app Yarn 4 via `corepack enable`.
+Prerequisites: Node 22 LTS (20 still works; the container uses 22), npm, and for the TV app Yarn 4 via `corepack enable`.
 
 ```bash
 npm ci
@@ -24,6 +24,30 @@ VITE_API_MODE=mock npm run dev -w apps/web     # fully offline mock data
 cd apps/tv && corepack enable && yarn install
 EXPO_PUBLIC_API_URL=http://localhost:8787 yarn dev:web
 ```
+
+### One container (what gets deployed)
+
+The production shape is a single Node process that serves the phone PWA at `/`, the browser TV view
+at `/tv/` and the API on the same origin (`services/api/src/server/main.ts`).
+
+```bash
+docker build -t gottawatch .
+docker run -p 8080:8080 -e NEBIUS_API_KEY -v gw-data:/data gottawatch
+# → http://localhost:8080 (phone) and http://localhost:8080/tv/ (TV). Profile links for the seeded
+#   demo people and the judge are written to /data/seed-links.txt (mode 600, never logged).
+```
+
+| Env | Default | Notes |
+|---|---|---|
+| `NEBIUS_API_KEY` | none | Turns on Ask (Nemotron 3 Super → Nano → heuristic) and Tonight's pick (Nano). Without it both use the deterministic fallback |
+| `STORE_MODE` | `file` in the image | `file` (`SNAPSHOT_FILE`, default `/data/state.json`), `s3` or `memory` |
+| `SNAPSHOT_BUCKET` / `SNAPSHOT_KEY` / `S3_ENDPOINT` / `S3_REGION` | – / `gottawatch/store.json` / – / `us-north1` | `s3` mode, e.g. Nebius Object Storage `https://storage.us-north1.nebius.cloud` with `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. Seed links are written next to the snapshot object |
+| `PICK_MODE` / `ASK_MODE` | `nebius` when a key is set | `stub` / `off` to force the offline paths |
+| `SEED_ON_BOOT` / `SEED_JUDGES` | `1` / `1` | Seeds the demo circle + N judge households when the store is empty |
+| `DEMO_REFRESH_HOURS` | `72` | Re-dates the demo recs when they go stale. Keeps every link valid but resets judge Seen marks and sends |
+
+Local without Docker: `npm run serve -w services/api` after building `apps/web` (`VITE_API_URL=same-origin`) and
+the TV export (`cd apps/tv && EXPO_PUBLIC_API_URL=same-origin scripts/export-web.sh`).
 
 ## Repo map
 

@@ -1,0 +1,21 @@
+# Keep the build context small and secret-free.
+**/node_modules
+**/dist
+**/.expo
+**/build
+.git
+.secrets
+.seed-output
+**/seed-links*
+**/*.links.json
+**/*.tokens.json
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.log
+docs
+tools
+apps/tv/apps/vega/build
+apps/tv/android
+apps/tv/ios
