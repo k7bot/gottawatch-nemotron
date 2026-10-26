@@ -5,6 +5,7 @@ import { friendHue, groupInbox, initials, joinNames, posterAt, posterUrl, recomm
 import { serviceName, summarizeService } from '@gottawatch/contract';
 import { EmailSection, useEmailEnabled } from './email';
 import { InviteSheet } from './invite';
+import { AskPanel } from './ask';
 
 const connectedOn = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -116,6 +117,16 @@ export function ForYou({ api, token, inbox, reloadInbox, go }: { api: ApiClient;
     <main>
       <h1 className="display">For you</h1>
       <p className="sub">{groups.length ? 'What your friends think you should watch.' : ''}</p>
+      {groups.length > 1 && (
+        <AskPanel
+          api={api}
+          token={token}
+          onWatched={(recId) => {
+            const g = groups.find((x) => x.recs.some((r) => r.id === recId));
+            if (g) void markWatched(g);
+          }}
+        />
+      )}
       {err && <div className="notice err" role="alert"><p style={{ margin: 0 }}>{err}</p></div>}
       {groups.length === 0 && (
         <div className="notice">
@@ -138,8 +149,7 @@ export function ForYou({ api, token, inbox, reloadInbox, go }: { api: ApiClient;
                 </div>
                 <div className="from">
                   <span className="stack">{g.recs.slice(0, 3).map((r) => <Avatar key={r.id} id={r.from.id} name={r.from.displayName} size={24} />)}</span>
-                  <span>{recommendLine(g.senders)}</span>
-                  <span className="caption">· {timeAgo(Date.parse(g.latest), Date.now())}</span>
+                  <span>{recommendLine(g.senders)} <span className="caption fromline">· {timeAgo(Date.parse(g.latest), Date.now())}</span></span>
                 </div>
                 {notes.map((r) => (
                   <p key={r.id} className="quote">“{r.note}” <span className="caption">{r.from.displayName}</span></p>

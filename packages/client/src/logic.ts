@@ -1,5 +1,6 @@
 // Pure helpers (unit-tested): pairing-code normalization, recipients, labels, recent sends.
 import { cleanCustomTitle, CUSTOM_YEAR_MIN, DEMO_SERVICES, LIVE_SERVICES, OTHER_SERVICE_ID, PAIR_CODE_ALPHABET, serviceName, PAIR_CODE_LENGTH, type CreateRecommendationRequest, type TitleRef } from '@gottawatch/contract';
+import type { AskChip } from '@gottawatch/contract';
 import type { Friend } from './api';
 
 /** Uppercase, drop spaces/dashes and anything outside the pairing alphabet, max 6 (ux §6.4, R23). */
@@ -226,4 +227,67 @@ export function providerHint(providers: string[] | undefined): string | null {
   return names.length === 1
     ? `Looks like it's on ${list} in the US. Change it if they watch somewhere else.`
     : `Looks like it's on ${list} in the US. Pick the one they use.`;
+}
+
+// --- Ask Gottawatch (Nemotron on Nebius) ---------------------------------------------------
+export const ASK_CHIPS: { id: AskChip; label: string }[] = [
+  { id: 'short', label: 'Short' },
+  { id: 'funny', label: 'Funny' },
+  { id: 'light', label: 'Light' },
+  { id: 'intense', label: 'Intense' },
+  { id: 'together', label: 'Together' },
+  { id: 'movie', label: 'Movie' },
+  { id: 'show', label: 'Show' },
+];
+export const ASK_MAX_CHIPS = 5;
+/** Toggle a chip; "movie" and "show" are mutually exclusive, and at most ASK_MAX_CHIPS stay on. */
+export function toggleChip(on: AskChip[], c: AskChip): AskChip[] {
+  if (on.includes(c)) return on.filter((x) => x !== c);
+  const next = on.filter((x) => !(c === 'movie' && x === 'show') && !(c === 'show' && x === 'movie'));
+  return [...next, c].slice(-ASK_MAX_CHIPS);
+}
+export const ASK_EXAMPLES = ['Something short and funny', "We're both tired", 'Worth staying up for', 'Something we can watch with the kids'];
+
+export function askErrorCopy(kind: string): string {
+  if (kind === 'offline') return "You're offline. Ask again when you're back.";
+  if (kind === 'rate_limited') return "That's a lot of asking. Give it a few minutes, or just pick from the list below.";
+  if (kind === 'unauthorized') return 'This link signed out. Open your Gottawatch link again.';
+  return "Couldn't get an answer just now. Try again, or pick from the list below.";
+}
+
+/** Small honest label for where the answer came from. */
+export function askSourceLabel(source: string): string {
+  if (source === 'nemotron-agent') return 'Picked by Nemotron 3 Super on Nebius';
+  if (source === 'nemotron-fast') return 'Picked by Nemotron 3 Nano on Nebius';
+  return 'Picked by friend count (the AI was busy)';
+}
+
+const TOOL_COPY: Record<string, string> = {
+  get_friend_picks: "Read your friends' picks and notes",
+  get_watch_history: "Checked what you've already watched",
+  get_title_details: 'Looked up a title',
+  search_catalog: 'Searched the catalog',
+};
+/** Plain-language trace rows for "How I picked this". */
+export function askTraceRows(trace: { kind: string; label: string; detail?: string; ms?: number }[]): { text: string; meta?: string }[] {
+  return trace.map((t) => {
+    const ms = t.ms !== undefined ? (t.ms >= 1000 ? `${(t.ms / 1000).toFixed(1)}s` : `${t.ms}ms`) : undefined;
+    if (t.kind === 'tool') return { text: TOOL_COPY[t.label] ?? t.label, ...(ms ? { meta: ms } : {}) };
+    if (t.kind === 'model') {
+      const name = /super/i.test(t.label) ? 'Nemotron 3 Super' : /nano/i.test(t.label) ? 'Nemotron 3 Nano' : t.label;
+      const what = t.detail === 'answer' ? 'wrote the answer' : t.detail === 'one-shot rerank' ? 'ranked the picks' : /tool call/.test(t.detail ?? '') ? 'decided what to look up' : 'thought';
+      return { text: `${name} ${what}`, ...(ms ? { meta: ms } : {}) };
+    }
+    if (t.label === 'grounding') return { text: t.detail?.startsWith('dropped') ? 'Removed anything not backed by a friend' : "Checked every quote against your friends' notes" };
+    if (t.label === 'fallback') return { text: 'Ranked by how many friends picked it' };
+    const CHECKS: Record<string, string> = {
+      nudge: "Reminded it to start from your friends' picks",
+      'agent out of time': 'Took too long, so a faster model finished',
+      'agent failed': 'The big model was busy',
+      'fast model failed': 'The fast model was busy too',
+      'agent used all rounds': 'Out of steps, so a faster model finished',
+    };
+    if (CHECKS[t.label]) return { text: CHECKS[t.label]! };
+    return { text: t.label.charAt(0).toUpperCase() + t.label.slice(1) };
+  });
 }

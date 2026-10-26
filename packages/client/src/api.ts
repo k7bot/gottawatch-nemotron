@@ -26,6 +26,9 @@ import {
   type AcceptInviteResponse as AcceptT,
   TitleSearchResponse,
   TitleDetailsResponse,
+  AskResponse,
+  type AskChip,
+  type AskResponse as AskT,
   type CreateRecommendationRequest,
   type FriendsResponse as FriendsT,
   type MeResponse as MeT,
@@ -39,8 +42,10 @@ export type Home = HomeT;
 export type { InviteItem };
 export type InvitePreview = InvitePreviewT;
 export type AcceptResult = AcceptT;
+export type AskResult = AskT;
+export type { AskChip };
 
-export type FailureKind = 'unauthorized' | 'not_found' | 'expired' | 'conflict' | 'offline' | 'server' | 'contract' | 'client';
+export type FailureKind = 'unauthorized' | 'not_found' | 'expired' | 'conflict' | 'offline' | 'rate_limited' | 'server' | 'contract' | 'client';
 export class ApiFailure extends Error {
   constructor(public kind: FailureKind, message: string, public status?: number) {
     super(message);
@@ -57,7 +62,8 @@ export function kindForStatus(s: number): FailureKind {
   if (s === 404) return 'not_found';
   if (s === 410) return 'expired';
   if (s === 409) return 'conflict';
-  if (s === 429 || s >= 500) return 'server';
+  if (s === 429) return 'rate_limited';
+  if (s >= 500) return 'server';
   return 'client';
 }
 
@@ -90,6 +96,8 @@ export interface ApiClient {
   previewInvite(code: string): Promise<InvitePreview>;
   acceptInvite(token: string, code: string): Promise<AcceptResult>;
   removeFriend(token: string, id: string): Promise<void>;
+  // Ask Gottawatch (Nemotron on Nebius): picks from friends' recs for a mood/question
+  ask(token: string, query: string, chips: AskChip[], signal?: AbortSignal): Promise<AskResult>;
 }
 
 interface Schema<T> {
@@ -101,9 +109,9 @@ export class LiveApiClient implements ApiClient {
   readonly mode = 'live' as const;
   constructor(private base: string, private fetchFn: FetchFn = (u, i) => fetch(u, i), private timeoutMs = 10000) {}
 
-  private async call<T>(method: string, path: string, token: string, schema: Schema<T>, body?: unknown, signal?: AbortSignal): Promise<T> {
+  private async call<T>(method: string, path: string, token: string, schema: Schema<T>, body?: unknown, signal?: AbortSignal, timeoutMs = this.timeoutMs): Promise<T> {
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), this.timeoutMs);
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
     signal?.addEventListener('abort', () => ctl.abort());
     let res: Response;
     try {
@@ -196,6 +204,10 @@ export class LiveApiClient implements ApiClient {
   }
   async removeFriend(t: string, id: string) {
     await this.call('DELETE', `/friends/${encodeURIComponent(id)}`, t, OkResponse);
+  }
+  /** The agent has a 12s server budget (tool calls + grounding), so allow 20s here. */
+  ask(t: string, query: string, chips: AskChip[], signal?: AbortSignal) {
+    return this.call('POST', '/ask', t, AskResponse, { query, chips }, signal, Math.max(this.timeoutMs, 20000));
   }
   async emailVerify(email: string, code: string) {
     return (await this.call('POST', '/auth/email/verify', '', EmailSignInResponse, { email, code })).profileToken;
@@ -337,6 +349,32 @@ export class MockApiClient implements ApiClient {
   async removeFriend(_t: string, id: string) {
     await this.wait();
     this.mockFriends = this.mockFriends.filter((f) => f.id !== id);
+  }
+  async ask(_t: string, query: string, chips: AskChip[]): Promise<AskResult> {
+    await new Promise((r) => setTimeout(r, this.latencyMs * 4)); // the agent is slower than a list call
+    if (this.scenario === 'offline') throw new ApiFailure('offline', 'Network error (mock)');
+    if (this.scenario === 'ask-limit') throw new ApiFailure('rate_limited', 'HTTP 429 (mock)', 429);
+    if (this.scenario === 'ask-error') throw new ApiFailure('server', 'HTTP 500 (mock)', 500);
+    const short = chips.includes('short') || /short|quick|tired/i.test(query);
+    const picks = short
+      ? [{ recId: 'm1', title: 'Kestrel Bay', reason: '40-minute episodes, and Sam says to start at episode 2.', quotes: ['Start at ep 2'], from: ['Sam'], runtime: 40 }]
+      : [
+          { recId: 'm1', title: 'Kestrel Bay', reason: 'Two friends picked it this week, and Sam left you a tip.', quotes: ['Start at ep 2'], from: ['Sam', 'Kiran'], runtime: 40 },
+          { recId: 'm3', title: 'The Quiet Orchard', reason: 'Maya sent it and it is a full movie for a slower night.', quotes: [], from: ['Maya'] },
+        ];
+    return AskResponse.parse({
+      answer: short ? 'Short and easy tonight: start Kestrel Bay.' : 'Kestrel Bay is the one your friends agree on. The Quiet Orchard if you want a movie.',
+      picks,
+      source: 'nemotron-agent',
+      model: 'nvidia/nemotron-3-super-120b-a12b',
+      trace: [
+        { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: '2 tool call(s)', ms: 1400 },
+        { kind: 'tool', label: 'get_friend_picks', detail: '{}', ms: 3 },
+        { kind: 'tool', label: 'get_watch_history', detail: '{}', ms: 2 },
+        { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: 'answer', ms: 1900 },
+        { kind: 'check', label: 'grounding', detail: `${picks.length} pick(s) grounded` },
+      ],
+    });
   }
   async home(): Promise<Home> {
     await this.wait();

@@ -169,3 +169,47 @@ describe('signed-out welcome copy', () => {
     }
   });
 });
+
+import { ASK_CHIPS, askErrorCopy, askSourceLabel, askTraceRows, toggleChip } from '../logic';
+
+describe('Ask Gottawatch', () => {
+  const res = (status: number, body?: unknown) => new Response(body === undefined ? null : JSON.stringify(body), { status });
+  const answer = {
+    answer: 'Start Kestrel Bay.',
+    picks: [{ recId: 'r1', title: 'Kestrel Bay', reason: 'Two friends picked it.', quotes: ['start at ep 2'], from: ['Priya', 'Sam'], runtime: 40 }],
+    source: 'nemotron-agent',
+    model: 'nvidia/nemotron-3-super-120b-a12b',
+    trace: [{ kind: 'tool', label: 'get_friend_picks', ms: 3 }, { kind: 'check', label: 'grounding', detail: '1 pick(s) grounded' }],
+  };
+  it('posts query + chips to /ask and validates the answer', async () => {
+    const f = vi.fn(async () => res(200, answer));
+    const api = new LiveApiClient('', f as never);
+    const r = await api.ask(TOKEN, 'something short', ['short', 'funny']);
+    expect(r.picks[0]!.title).toBe('Kestrel Bay');
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/ask'); // same-origin base
+    expect(JSON.parse(String(init.body))).toEqual({ query: 'something short', chips: ['short', 'funny'] });
+  });
+  it('429 is its own kind with friendly copy', async () => {
+    const api = new LiveApiClient('', (async () => res(429, { error: { code: 'rate_limited', message: 'x' } })) as never);
+    await expect(api.ask(TOKEN, '', ['light'])).rejects.toMatchObject({ kind: 'rate_limited' });
+    expect(askErrorCopy('rate_limited')).toMatch(/few minutes/);
+    expect(askErrorCopy('offline')).toMatch(/offline/);
+  });
+  it('chips: movie/show exclusive, max 5, toggle off', () => {
+    expect(toggleChip(['movie'], 'show')).toEqual(['show']);
+    expect(toggleChip(['short', 'funny'], 'funny')).toEqual(['short']);
+    expect(toggleChip(['short', 'funny', 'light', 'intense', 'together'], 'movie')).toHaveLength(5);
+    expect(ASK_CHIPS.map((c) => c.id)).toEqual(['short', 'funny', 'light', 'intense', 'together', 'movie', 'show']);
+  });
+  it('trace and source read as plain language', () => {
+    const rows = askTraceRows([...answer.trace, { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: '2 tool call(s)', ms: 1400 }]);
+    expect(rows.map((r) => r.text)).toEqual(["Read your friends' picks and notes", "Checked every quote against your friends' notes", 'Nemotron 3 Super decided what to look up']);
+    expect(rows[2]!.meta).toBe('1.4s');
+    expect(askSourceLabel('fallback')).toMatch(/friend count/);
+  });
+  it('mock ask is contract-valid, including the limit scenario', async () => {
+    expect((await new MockApiClient('default', 0).ask(TOKEN, '', ['short'])).picks).toHaveLength(1);
+    await expect(new MockApiClient('ask-limit', 0).ask(TOKEN, 'x', [])).rejects.toMatchObject({ kind: 'rate_limited' });
+  });
+});
