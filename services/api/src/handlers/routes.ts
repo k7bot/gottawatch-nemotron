@@ -6,6 +6,7 @@ import { forgetTv, getHome, getSent, homeOf } from "../domain/phone.js";
 import { startAddEmail, startEmailSignIn, verifyAddEmail, verifyEmailSignIn } from "../domain/email.js";
 import { acceptInvite, cancelInvite, createInvite, listInvites, previewInvite, removeFriend } from "../domain/invites.js";
 import { getTonight } from "../domain/tonight.js";
+import { askGottawatch } from "../domain/ask.js";
 import { createRecommendation, listFriends, searchTitles, titleDetails } from "../domain/recommend.js";
 import type { AppDeps } from "../lib/deps.js";
 import { ApiError, auth, json, jsonBody, parse, wrap, type ApiEvent } from "../lib/http.js";
@@ -180,5 +181,36 @@ export function makeTonightHandler(getDeps: () => AppDeps) {
     const ctx = auth(event, "device");
     const res = await getTonight(getDeps(), ctx.householdId);
     return res ? json(200, res) : json(204);
+  });
+}
+
+/** Per-household Ask limit (in-process; one container). Model calls cost money and time. */
+export const ASK_LIMIT = { max: 20, windowMs: 10 * 60 * 1000 };
+const askHits = new Map<string, number[]>();
+export function askAllowed(householdId: string, now: number): boolean {
+  const recent = (askHits.get(householdId) ?? []).filter((t) => now - t < ASK_LIMIT.windowMs);
+  if (recent.length >= ASK_LIMIT.max) {
+    askHits.set(householdId, recent);
+    return false;
+  }
+  recent.push(now);
+  askHits.set(householdId, recent);
+  return true;
+}
+
+/** POST /ask — TV (device token) or phone (profile token; household from the user record). */
+export function makeAskHandler(getDeps: () => AppDeps) {
+  return wrap(async (event: ApiEvent) => {
+    const deps = getDeps();
+    const ctx = auth(event);
+    const householdId = ctx.kind === "profile" ? (await homeOf(deps.store, ctx)).householdId : ctx.householdId;
+    const body = parse(C.AskRequest, jsonBody(event));
+    if (!askAllowed(householdId, deps.clock().getTime())) throw new ApiError("rate_limited", "Too many questions; try again in a few minutes");
+    const res = await askGottawatch(
+      { store: deps.store, clock: deps.clock, ...(deps.catalog ? { catalog: deps.catalog } : {}), ...(deps.chat ? { chat: deps.chat } : {}), ...(deps.agentModel ? { agentModel: deps.agentModel } : {}), ...(deps.fastModel ? { fastModel: deps.fastModel } : {}) },
+      householdId,
+      body,
+    );
+    return json(200, res);
   });
 }

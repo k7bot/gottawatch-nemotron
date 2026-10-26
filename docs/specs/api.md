@@ -67,7 +67,8 @@ Auth: `Authorization: Bearer <token>`. Device tokens (`wcd_…`) are issued by p
 | `POST /recommendations/{id}/seen` | device | | `{ ok: true }` |
 | `DELETE /recommendations/{id}/seen` | device | | `{ ok: true }`: undo; un-sees every rec of that title in the household (added Oct 12) |
 | `GET /seen?limit=20` | device | | `{ items: SeenItem[] }`: Watched history, one per title, newest `seenAt` first, max 50 (added Oct 12) |
-| `GET /tonight` | device | | `{ recId, title, poster?, reason, source:"bedrock"|"stub"|"fallback" }` (`stub` proposed: TV renders it like `bedrock`); **204** when no candidates (proposed, OQ-11) |
+| `GET /tonight` | device | | `{ recId, title, poster?, reason, source:"nebius"|"bedrock"|"stub"|"fallback" }` (`stub` proposed: TV renders it like `bedrock`); **204** when no candidates (proposed, OQ-11) |
+| `POST /ask` | device or profile | `{ query?: string ≤300, chips?: ("short"|"funny"|"light"|"intense"|"together"|"movie"|"show")[] }` (one of them required) | `{ answer, picks: [{ recId, title, reason, quotes[], from[], poster?, runtime? }] ≤3, source:"nemotron-agent"|"nemotron-fast"|"fallback", model?, trace[] }`; **429** `rate_limited` after 20 asks per household per 10 min |
 | `GET /me/feed` | profile | `?limit=` | `{ items: FeedItem[] }`: same as `/feed` for the caller's home (ADR-0013) |
 | `GET /me/seen` | profile | `?limit=` | `{ items: SeenItem[] }` |
 | `POST /me/seen/{id}` · `DELETE /me/seen/{id}` | profile | | `{ ok: true }`: same rules as the device routes |
@@ -138,3 +139,12 @@ Wording is gentle on purpose: no "disconnect", "delete" or "remove".
 - **Where-to-watch prefill:** when TMDB lists exactly one known US streaming service, it is pre-selected in the recommend sheet (user can change it). Several → those move to the front and the user picks. None → user picks as before.
 - **Attribution:** TMDB notice (+ logo) and "Where-to-watch data from JustWatch" on the About screens (TV, phone, web). Non-commercial use only.
 - **Demo mode:** `CATALOG_MODE=demo` serves the made-up catalog (no posters, no real services) for the video.
+
+## Ask Gottawatch + Nemotron on Nebius (Oct 26)
+
+- `PICK_MODE=nebius` runs Tonight's pick on Nemotron 3 Nano via Nebius Token Factory (`NEBIUS_API_KEY`, optional `NEBIUS_BASE_URL`, `NEBIUS_PICK_MODEL`). Same prompt, validation, cache and one-attempt guard as before.
+- `POST /ask` (`src/domain/ask.ts`) is a tool-calling agent on Nemotron 3 Super 120B (`NEBIUS_AGENT_MODEL`). Tools: `get_friend_picks` (filters: maxRuntime, mediaType, genre), `get_title_details`, `get_watch_history`, `search_catalog`. All tools read only the caller's household and the catalog.
+- Limits: 4 model rounds, 12 s total, 8 s per call, reasoning off, JSON mode after the first round. If the agent answers without reading friend picks, it is sent back once.
+- Grounding check on every model answer: picks must be unseen candidates; quotes must appear verbatim in that title's notes; a reason may not quote unseen text or attribute words to a friend who left no note; reason ≤ 220 chars.
+- Chain: agent → one-shot Nano rerank → deterministic fallback (keyword filter + popularity). `ASK_MODE=off` (or no key) uses only the fallback. The answer always says which step produced it (`source`) and includes a `trace` for the demo.
+- Model choice and measurements: `tools/model-eval/RESULTS.md`. Local end-to-end check: `tools/e2e/local-ask.mjs`.
