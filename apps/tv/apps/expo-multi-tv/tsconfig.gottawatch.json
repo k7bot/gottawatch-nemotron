@@ -1,0 +1,20 @@
+{
+  // Typecheck for the Gottawatch TV code only (the sample's leftover screens aren't checked).
+  // Shared-ui sources live outside this app, so bare imports are mapped to this app's node_modules.
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "types": [],
+    "paths": {
+      "@gottawatch/contract": ["../../../../packages/contract/src/index.ts"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "*": ["./node_modules/*", "./node_modules/@types/*"]
+    }
+  },
+  "include": ["../../packages/shared-ui/src/gottawatch/**/*.ts", "../../packages/shared-ui/src/gottawatch/**/*.tsx", "expo-env.d.ts"],
+  "exclude": ["../../packages/shared-ui/src/gottawatch/**/__tests__/**"]
+}

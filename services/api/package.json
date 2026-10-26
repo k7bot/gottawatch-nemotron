@@ -1,0 +1,30 @@
+{
+  "name": "@gottawatch/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p .",
+    "smoke": "tsx scripts/smoke.ts",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^20.19.43",
+    "@types/nodemailer": "^8.0.2",
+    "typescript": "~5.9",
+    "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1149.0",
+    "@aws-sdk/client-dynamodb": "^3.1149.0",
+    "@aws-sdk/client-secrets-manager": "^3.1150.0",
+    "@aws-sdk/client-sesv2": "^3.1150.0",
+    "@aws-sdk/client-ssm": "^3.1152.0",
+    "@aws-sdk/lib-dynamodb": "^3.1149.0",
+    "@gottawatch/contract": "*",
+    "nodemailer": "^7.0.13",
+    "zod": "^4.6.6"
+  }
+}

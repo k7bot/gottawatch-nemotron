@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+# Build output
+dist/
+build/
+*.vpkg
+*.apk
+*.aab
+cdk.out/
+.expo/
+android/app/build/
+.gradle/
+# Env / secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Logs & OS cruft
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+coverage/
+# Seed script output: judge/profile links contain bearer tokens (never commit)
+.secrets/
+seed-links*
+*.links.json
+*.tokens.json
+# CDK outputs file
+cdk-outputs*.json
+
+# Seed output (profile tokens)
+.seed-output/

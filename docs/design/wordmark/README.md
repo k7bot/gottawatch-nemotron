@@ -1,0 +1,1 @@
+Wordmark options (A chosen). `options.html` rendered with headless Chrome against the @expo-google-fonts TTFs (Fraunces was installed temporarily for option B and has since been removed, so B falls back if re-rendered).

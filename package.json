@@ -1,0 +1,19 @@
+{
+  "name": "gottawatch",
+  "private": true,
+  "description": "Gottawatch backend, shared contract and phone web app (apps/tv has its own Yarn workspace)",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/web"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test:tv": "vitest run --config apps/tv/packages/shared-ui/vitest.config.mts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
