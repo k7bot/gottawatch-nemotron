@@ -275,7 +275,7 @@ function PickContent({ hero, now, transition, showDevTags }: { hero: ReturnType<
     <View style={{ maxWidth: px(1000) }}>
       {transition && <Text style={[type.label, { marginBottom: px(12) }]}>{TRANSITION_COPY}</Text>}
       {/* Lamp dot only on real bedrock picks (ADR-0009); dev builds tag the source (tv-app §3.3). */}
-      <Overline text={overline} accent={hero.kind !== 'newest'} lamp={t?.source === 'bedrock'} tag={undefined /* source stays in t.source; no visible tag (Kiran, Oct 13) */} />
+      <Overline text={overline} accent={hero.kind !== 'newest'} lamp={t?.source === 'bedrock' || t?.source === 'nebius'} tag={undefined /* source stays in t.source; no visible tag (Kiran, Oct 13) */} />
       <Text numberOfLines={2} style={type.display}>{title}</Text>
       {primary ? <Text style={[type.label, { marginTop: px(8) }]}>{card ? withService(metaLine(primary), card) : metaLine(primary)}</Text> : null}
       {t ? (

@@ -21,6 +21,7 @@ const STATUS: Record<ErrorCode, number> = {
   not_found: 404,
   conflict: 409,
   expired: 410,
+  rate_limited: 429,
   internal: 500,
 };
 

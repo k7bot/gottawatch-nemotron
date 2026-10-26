@@ -82,7 +82,7 @@ export interface Pick {
   date: string; // YYYY-MM-DD household-local
   recId: string;
   reason: string;
-  source: "bedrock" | "stub";
+  source: "nebius" | "bedrock" | "stub";
   createdAt: string;
 }
 

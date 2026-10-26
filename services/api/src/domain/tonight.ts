@@ -71,7 +71,7 @@ export interface PickerOutput {
 }
 /** Returns undefined on any failure (caller falls back). */
 export interface Picker {
-  readonly source: "stub" | "bedrock";
+  readonly source: "stub" | "bedrock" | "nebius";
   pick(input: PickerInput): Promise<PickerOutput | undefined>;
 }
 
@@ -148,8 +148,8 @@ export async function getTonight(deps: TonightDeps, householdId: string): Promis
   const candidates = groupCandidates(unseen);
   if (candidates.length < 2) return fallback();
 
-  // Bedrock: at most one attempt per household per guard window (spec §5 PICKTRY).
-  if (deps.picker.source === "bedrock") {
+  // Model pickers: at most one attempt per household per guard window (spec §5 PICKTRY).
+  if (deps.picker.source !== "stub") {
     const claimed = await deps.store.claimPickAttempt(householdId, date, new Date(now.getTime() + ATTEMPT_GUARD_MS));
     if (!claimed) return fallback();
   }

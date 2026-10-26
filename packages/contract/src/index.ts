@@ -46,6 +46,7 @@ export const ErrorCode = z.enum([
   "not_found",
   "conflict",
   "expired",
+  "rate_limited",
   "internal",
 ]);
 export const ErrorBody = z.object({
@@ -218,9 +219,10 @@ export function cleanName(raw: string): string {
 }
 
 // --- Tonight's pick --------------------------------------------------------
+// "nebius" = Nemotron on Nebius Token Factory (PICK_MODE=nebius).
 // "stub" (proposed, OQ-10): PICK_MODE=stub picks; the TV renders them like "bedrock"
 // ("Tonight's pick" label) but the API stays honest about where the pick came from.
-export const PickSource = z.enum(["bedrock", "stub", "fallback"]);
+export const PickSource = z.enum(["nebius", "bedrock", "stub", "fallback"]);
 export const TonightResponse = z.object({
   recId: id,
   title: z.string().min(1),
@@ -228,6 +230,44 @@ export const TonightResponse = z.object({
   reason: z.string().min(1).max(REASON_MAX),
   source: PickSource,
 });
+
+// --- Ask Gottawatch (Nemotron agent on Nebius Token Factory) ---------------
+export const ASK_QUERY_MAX = 300;
+export const AskChip = z.enum(["short", "funny", "light", "intense", "together", "movie", "show"]);
+export const AskRequest = z.object({
+  query: z.string().trim().max(ASK_QUERY_MAX).default(""),
+  chips: z.array(AskChip).max(5).default([]),
+}).refine((r) => r.query.length > 0 || r.chips.length > 0, { message: "Ask needs a question or at least one chip" });
+export const AskPick = z.object({
+  recId: id,
+  title: z.string().min(1),
+  reason: z.string().min(1).max(REASON_MAX),
+  /** Exact phrases from friends' notes (checked server-side). */
+  quotes: z.array(z.string()).max(3),
+  from: z.array(z.string()),
+  poster: z.string().url().optional(),
+  runtime: z.number().int().positive().optional(),
+});
+export const AskSource = z.enum(["nemotron-agent", "nemotron-fast", "fallback"]);
+export const AskTraceStep = z.object({
+  kind: z.enum(["model", "tool", "check"]),
+  label: z.string(),
+  detail: z.string().optional(),
+  ms: z.number().int().nonnegative().optional(),
+});
+export const AskResponse = z.object({
+  answer: z.string().min(1).max(400),
+  picks: z.array(AskPick).max(3),
+  source: AskSource,
+  model: z.string().optional(),
+  trace: z.array(AskTraceStep),
+});
+export type AskChip = z.infer<typeof AskChip>;
+export type AskRequest = z.infer<typeof AskRequest>;
+export type AskPick = z.infer<typeof AskPick>;
+export type AskSource = z.infer<typeof AskSource>;
+export type AskTraceStep = z.infer<typeof AskTraceStep>;
+export type AskResponse = z.infer<typeof AskResponse>;
 
 export type DeviceId = z.infer<typeof DeviceId>;
 export type ErrorCode = z.infer<typeof ErrorCode>;

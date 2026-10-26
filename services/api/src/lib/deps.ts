@@ -12,6 +12,8 @@ import { resendMailer } from "./resend.js";
 import { demoCatalog, type Catalog } from "../catalog/index.js";
 import { tmdbCatalog, tmdbFetcher } from "../catalog/tmdb.js";
 import { ssmFetcher } from "./ssm.js";
+import { makeNebiusPicker } from "../domain/nebiusPicker.js";
+import { MODELS, tokenFactoryChat, type ChatFn } from "./tokenFactory.js";
 
 export interface AppDeps {
   store: Store;
@@ -23,6 +25,10 @@ export interface AppDeps {
   webOrigin?: string;
   /** Title catalog (CATALOG_MODE). Undefined = demo (made-up titles). */
   catalog?: Catalog;
+  /** Ask Gottawatch model transport (ASK_MODE=nebius). Undefined = deterministic answers only. */
+  chat?: ChatFn;
+  agentModel?: string;
+  fastModel?: string;
 }
 export interface Mailer {
   send(to: string, subject: string, text: string, html?: string): Promise<void>;
@@ -35,7 +41,23 @@ export function pickerFromEnv(env: NodeJS.ProcessEnv = process.env): Picker {
     if (!env.BEDROCK_MODEL_ID) throw new Error("PICK_MODE=bedrock needs BEDROCK_MODEL_ID");
     return makeBedrockPicker(sdkConverse(), env.BEDROCK_MODEL_ID);
   }
+  if (mode === "nebius") return makeNebiusPicker(chatFromEnv(env), env.NEBIUS_PICK_MODEL || MODELS.fast);
   throw new Error(`Unknown PICK_MODE: ${mode}`);
+}
+
+/** Token Factory transport from NEBIUS_API_KEY (+ optional NEBIUS_BASE_URL). */
+export function chatFromEnv(env: NodeJS.ProcessEnv = process.env): ChatFn {
+  const key = env.NEBIUS_API_KEY;
+  if (!key) throw new Error("Nebius mode needs NEBIUS_API_KEY");
+  return tokenFactoryChat({ apiKey: key, ...(env.NEBIUS_BASE_URL ? { baseUrl: env.NEBIUS_BASE_URL } : {}) });
+}
+
+/** ASK_MODE=nebius (agent + fast fallback) or off (deterministic fallback only). Default: nebius when a key is set. */
+export function askFromEnv(env: NodeJS.ProcessEnv = process.env): Pick<AppDeps, "chat" | "agentModel" | "fastModel"> {
+  const mode = env.ASK_MODE ?? (env.NEBIUS_API_KEY ? "nebius" : "off");
+  if (mode === "off") return {};
+  if (mode !== "nebius") throw new Error(`Unknown ASK_MODE: ${mode}`);
+  return { chat: chatFromEnv(env), agentModel: env.NEBIUS_AGENT_MODEL || MODELS.agent, fastModel: env.NEBIUS_PICK_MODEL || MODELS.fast };
 }
 
 let cached: AppDeps | undefined;
@@ -44,7 +66,7 @@ export function depsFromEnv(): AppDeps {
     const table = process.env.TABLE_NAME;
     if (!table) throw new Error("TABLE_NAME is not set");
     const store = new DynamoStore(table);
-    cached = { store, catalog: catalogFromEnv(store), clock: systemClock, picker: pickerFromEnv(), mailer: mailerFromEnv(), webOrigin: process.env.WEB_ORIGIN };
+    cached = { store, catalog: catalogFromEnv(store), clock: systemClock, picker: pickerFromEnv(), ...askFromEnv(), mailer: mailerFromEnv(), webOrigin: process.env.WEB_ORIGIN };
   }
   return cached;
 }
