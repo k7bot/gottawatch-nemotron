@@ -2,7 +2,8 @@
 // browser view (/tv/). Everything is configured from env (deploy/nebius/README.md):
 //   PORT (8080)  WEB_DIST (./web)  TV_DIST (<WEB_DIST>/tv)
 //   STORE_MODE memory|file|s3 (+ SNAPSHOT_* / S3_* / AWS_* for Nebius Object Storage)
-//   CATALOG_MODE demo (default here)  PICK_MODE stub|nebius  ASK_MODE nebius|off  NEBIUS_API_KEY
+//   CATALOG_MODE demo (default here)  PICK_MODE stub|nebius (default here: nebius when NEBIUS_API_KEY is set)
+//   ASK_MODE nebius|off  NEBIUS_API_KEY
 //   SEED_ON_BOOT (1) seeds the demo personas into an empty store; SEED_JUDGES (1) judge households;
 //   DEMO_REFRESH_HOURS (72) re-dates the demo recs so they never age out during judging (0 = off).
 // Plaintext profile links exist only at seed time; they go to SEED_LINKS_FILE (mode 600) or, with
@@ -28,7 +29,9 @@ const store = persisted.store;
 const deps: AppDeps = {
   store,
   clock: systemClock,
-  picker: pickerFromEnv(env),
+  // Tonight's pick from Nemotron Nano when a key is present (one call per household per day, cached;
+  // any failure falls back to the deterministic pick).
+  picker: pickerFromEnv({ ...env, PICK_MODE: env.PICK_MODE ?? (env.NEBIUS_API_KEY ? "nebius" : "stub") }),
   ...askFromEnv(env),
   catalog: catalogFromEnv(store, { ...env, CATALOG_MODE: env.CATALOG_MODE ?? "demo" }),
   mailer: mailerFromEnv(env),
