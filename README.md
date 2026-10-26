@@ -49,6 +49,10 @@ docker run -p 8080:8080 -e NEBIUS_API_KEY -v gw-data:/data gottawatch
 Local without Docker: `npm run serve -w services/api` after building `apps/web` (`VITE_API_URL=same-origin`) and
 the TV export (`cd apps/tv && EXPO_PUBLIC_API_URL=same-origin scripts/export-web.sh`).
 
+### Hosting
+
+The demo runs on Northflank's free Sandbox with a persistent volume. See [deploy/northflank/README.md](deploy/northflank/README.md).
+
 ## Repo map
 
 | Path | What lives here |

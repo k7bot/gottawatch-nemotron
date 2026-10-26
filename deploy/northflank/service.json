@@ -1,0 +1,48 @@
+{
+  "name": "gottawatch",
+  "description": "Gottawatch: phone PWA, TV view and API in one container. Nemotron via Nebius Token Factory.",
+  "billing": { "deploymentPlan": "nf-compute-50" },
+  "deployment": {
+    "instances": 1,
+    "docker": { "configType": "default" },
+    "gracePeriodSeconds": 20,
+    "volumes": [
+      {
+        "id": "gw-data",
+        "mounts": [{ "containerMountPath": "/data" }],
+        "spec": { "accessMode": "ReadWriteOnce", "storageSize": 1024 }
+      }
+    ]
+  },
+  "ports": [{ "name": "http", "internalPort": 8080, "public": true, "protocol": "HTTP" }],
+  "vcsData": {
+    "projectUrl": "https://github.com/k7bot/gottawatch-nemotron",
+    "projectType": "github",
+    "projectBranch": "main"
+  },
+  "buildSource": "git",
+  "buildSettings": {
+    "dockerfile": { "buildEngine": "buildkit", "dockerFilePath": "/Dockerfile", "dockerWorkDir": "/" }
+  },
+  "buildConfiguration": {
+    "pathIgnoreRules": ["*.md", "docs/**"],
+    "isAllowList": false
+  },
+  "runtimeEnvironment": {
+    "PORT": "8080",
+    "STORE_MODE": "file",
+    "SNAPSHOT_FILE": "/data/state.json",
+    "PICK_MODE": "nebius",
+    "ASK_MODE": "nebius",
+    "DEMO_REFRESH_HOURS": "72",
+    "SEED_JUDGES": "1"
+  },
+  "healthChecks": [
+    { "protocol": "HTTP", "type": "startupProbe", "path": "/healthz", "port": 8080,
+      "initialDelaySeconds": 3, "periodSeconds": 5, "timeoutSeconds": 3, "failureThreshold": 24 },
+    { "protocol": "HTTP", "type": "readinessProbe", "path": "/healthz", "port": 8080,
+      "initialDelaySeconds": 0, "periodSeconds": 15, "timeoutSeconds": 3, "failureThreshold": 3, "successThreshold": 1 },
+    { "protocol": "HTTP", "type": "livenessProbe", "path": "/healthz", "port": 8080,
+      "initialDelaySeconds": 0, "periodSeconds": 30, "timeoutSeconds": 5, "failureThreshold": 4 }
+  ]
+}
