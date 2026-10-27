@@ -1,9 +1,12 @@
 // Ask Gottawatch on the TV: one D-pad press per mood (no typing on a remote). Pure helpers, unit-tested.
 import type * as C from '@gottawatch/contract';
+import { ASK_QUERY_MAX } from '@gottawatch/contract';
 import { ApiFailure } from './api';
 
 export type AskChip = C.AskChip;
 export type AskResult = C.AskResponse;
+
+export { ASK_QUERY_MAX };
 
 export const TV_ASK_CHIPS: { id: AskChip; label: string }[] = [
   { id: 'short', label: 'Short' },
@@ -23,8 +26,31 @@ export function askSourceLine(r: Pick<AskResult, 'source'> & { status?: AskResul
 
 /** Under a "nothing fits" answer: where to go next, without a keyboard. */
 export const TV_NO_MATCH_HINT = 'Try another mood, or ask a friend to send you one from their phone.';
-/** Under an off-topic answer (only reachable from the phone's typed questions; kept for parity). */
-export const TV_OFF_TOPIC_HINT = 'Pick a mood above and I will find something from your circle.';
+/** Under an off-topic answer (a typed question that isn't about what to watch). Focus returns to the moods. */
+export const TV_OFF_TOPIC_HINT = 'Pick a mood above, or type a question about what to watch.';
+
+/** What was asked: a mood chip, or the household's own words (sent as the query, no chips). */
+export type AskInput = { chip: AskChip; query?: undefined } | { query: string; chip?: undefined };
+
+/** The typed question to send, or undefined when there is nothing to send (empty submit does nothing). */
+export function typedQuery(draft: string): string | undefined {
+  const q = draft.replace(/\s+/g, ' ').trim().slice(0, ASK_QUERY_MAX);
+  return q ? q : undefined;
+}
+
+/** The hint under the text field. Web preview: keyboard keys; Fire TV: the on-screen keyboard's Done and the remote's Back. */
+export function typingHint(platform: string, length: number): string {
+  const keys = platform === 'web' ? 'Press Enter to ask · Esc to cancel' : 'Press Done to ask · Back to cancel';
+  const left = ASK_QUERY_MAX - length;
+  return left <= 50 ? `${keys} · ${left} left` : keys;
+}
+
+/** The line above a typed answer, so the room knows what was asked. Long questions are cut to one line. */
+export function askedLine(input: AskInput | undefined, max = 90): string | undefined {
+  if (!input?.query) return undefined;
+  const q = input.query.length > max ? input.query.slice(0, max - 1).replace(/\s+\S*$/, '') + '…' : input.query;
+  return `You asked “${q}”`;
+}
 
 /** The title behind the screen: the best bet, or nothing when nothing fits. */
 export function askBackdropTitle(r: Pick<AskResult, 'picks'> & { status?: AskResult['status'] }): string | undefined {

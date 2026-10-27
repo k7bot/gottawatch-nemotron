@@ -196,7 +196,7 @@ export class MockApiClient implements ApiClient {
     return SeenHistoryResponse.parse({ items: live.slice(0, limit) }).items;
   }
 
-  async ask(token: string, chips: string[]): Promise<AskResponse> {
+  async ask(token: string, chips: string[], query = ''): Promise<AskResponse> {
     await this.wait();
     await new Promise((r) => setTimeout(r, this.latency[0] * 2)); // the agent is slower than a list call
     this.checkToken(token);
@@ -217,7 +217,9 @@ export class MockApiClient implements ApiClient {
       { kind: 'tool', label: 'get_watch_history', detail: '{}', ms: 1 },
       { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: 'answer', ms: 1700 },
     ];
-    if (this.scenario === 'ask-offtopic') {
+    const q = query.toLowerCase();
+    // Typed questions (mock): trivia/gibberish is off topic; a genre nobody sent is a no_match.
+    if (this.scenario === 'ask-offtopic' || /capital|weather|asdf/.test(q)) {
       return AskResponse.parse({
         status: 'off_topic',
         answer: "I can only help pick something to watch from your friends' recommendations. Try one of the questions below, or tap a mood.",
@@ -225,8 +227,9 @@ export class MockApiClient implements ApiClient {
         trace: [...trace.slice(0, 1), { kind: 'check', label: 'off topic', detail: 'not a what-to-watch question; no picks' }],
       });
     }
-    if (this.scenario === 'ask-nomatch' || !picks.length) {
-      const near = this.scenario === 'ask-nomatch' ? qo ?? kb : kb;
+    const nothing = /horror|korean|western|tom hanks/.test(q);
+    if (this.scenario === 'ask-nomatch' || nothing || !picks.length) {
+      const near = this.scenario === 'ask-nomatch' || nothing ? qo ?? kb : kb;
       return AskResponse.parse({
         status: 'no_match',
         answer: chips.includes('movie') ? "None of your circle's picks are a movie you haven't seen yet." : "Nothing your circle sent fits that yet.",

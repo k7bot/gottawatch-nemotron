@@ -276,7 +276,7 @@ describe('greeting uses the household zone, not the device clock zone', () => {
   });
 });
 
-import { askBackdropTitle, askErrorCopy, askSourceLine, askTraceLine, TV_ASK_CHIPS, TV_NO_MATCH_HINT } from '../ask';
+import { ASK_QUERY_MAX, askBackdropTitle, askedLine, askErrorCopy, askSourceLine, askTraceLine, typedQuery, typingHint, TV_ASK_CHIPS, TV_NO_MATCH_HINT, TV_OFF_TOPIC_HINT } from '../ask';
 
 describe('Ask on the TV', () => {
   it('mock ask returns contract-valid picks from the feed, movie chip narrows to the movie', async () => {
@@ -314,6 +314,44 @@ describe('Ask on the TV', () => {
     expect(ok.status).toBe('ok');
     expect(askBackdropTitle(ok)).toBe('Kestrel Bay');
     expect(askBackdropTitle({ picks: ok.picks })).toBe('Kestrel Bay');
+  });
+  it('typed question: empty does nothing, spaces collapse, capped at the contract max', () => {
+    expect(typedQuery('')).toBeUndefined();
+    expect(typedQuery('   \n ')).toBeUndefined();
+    expect(typedQuery('  something   spooky\tbut cozy ')).toBe('something spooky but cozy');
+    expect(typedQuery('x'.repeat(ASK_QUERY_MAX + 40))).toHaveLength(ASK_QUERY_MAX);
+    expect(ASK_QUERY_MAX).toBe(300);
+  });
+  it('typing hint names the right keys and counts down near the limit', () => {
+    expect(typingHint('android', 10)).toBe('Press Done to ask · Back to cancel');
+    expect(typingHint('web', 10)).toBe('Press Enter to ask · Esc to cancel');
+    expect(typingHint('android', ASK_QUERY_MAX - 20)).toBe('Press Done to ask · Back to cancel · 20 left');
+  });
+  it('the typed question is shown above the answer (chips are not), long ones cut to one line', () => {
+    expect(askedLine({ query: 'something spooky but cozy' })).toBe('You asked “something spooky but cozy”');
+    expect(askedLine({ chip: 'short' })).toBeUndefined();
+    expect(askedLine(undefined)).toBeUndefined();
+    const long = askedLine({ query: 'word '.repeat(40).trim() })!;
+    expect(long.length).toBeLessThan(100);
+    expect(long.endsWith('…”')).toBe(true);
+  });
+  it('mock ask takes the query path: ok, no_match and off_topic', async () => {
+    const m = new MockApiClient({ latencyMs: [0, 0] });
+    const ok = await m.ask('wcd_x', [], 'something spooky but cozy');
+    expect(ok).toMatchObject({ status: 'ok' });
+    expect(ok.picks.length).toBeGreaterThan(0);
+    const none = await m.ask('wcd_x', [], 'a Korean horror movie');
+    expect(none).toMatchObject({ status: 'no_match', picks: [], closest: { title: 'The Quiet Orchard' } });
+    const off = await m.ask('wcd_x', [], "what's the capital of France");
+    expect(off).toMatchObject({ status: 'off_topic', picks: [] });
+    expect(TV_OFF_TOPIC_HINT).toMatch(/mood above/);
+  });
+  it('live client sends a typed question as the query with no chips', async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({ status: 'off_topic', answer: 'x', picks: [], source: 'nemotron-agent', trace: [] }), { status: 200 }));
+    const r = await new LiveApiClient('', f as never).ask('wcd_x', [], "what's the capital of France");
+    expect(r.status).toBe('off_topic');
+    const [, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ query: "what's the capital of France", chips: [] });
   });
   it('429 and offline get their own copy; chips are short enough for one row', async () => {
     await expect(new MockApiClient({ latencyMs: [0, 0], scenario: 'ask-limit' }).ask('wcd_x', ['funny'])).rejects.toMatchObject({ status: 429 });
