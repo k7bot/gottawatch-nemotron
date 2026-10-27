@@ -276,7 +276,7 @@ describe('greeting uses the household zone, not the device clock zone', () => {
   });
 });
 
-import { askErrorCopy, askTraceLine, TV_ASK_CHIPS } from '../ask';
+import { askBackdropTitle, askErrorCopy, askSourceLine, askTraceLine, TV_ASK_CHIPS, TV_NO_MATCH_HINT } from '../ask';
 
 describe('Ask on the TV', () => {
   it('mock ask returns contract-valid picks from the feed, movie chip narrows to the movie', async () => {
@@ -292,6 +292,29 @@ describe('Ask on the TV', () => {
     expect(askTraceLine(r)).toBe("Nemotron 3 Super on Nebius · read your circle's picks · skipped what you watched · checked 1 quote word for word · 3.0s");
     expect(askTraceLine({ source: 'fallback', trace: [], picks: [] })).toBe('Ranked by friend count');
   });
+  it('nothing fits: status no_match, no picks, the closest one offered (not as a best bet), no backdrop', async () => {
+    const m = new MockApiClient({ latencyMs: [0, 0] });
+    await m.markSeen('wcd_x', 'mock-r3');
+    const r = await m.ask('wcd_x', ['movie']);
+    expect(r).toMatchObject({ status: 'no_match', picks: [], closest: { title: 'Kestrel Bay' } });
+    expect(r.answer).toMatch(/None of your circle's picks/);
+    expect(askBackdropTitle(r)).toBeUndefined();
+    expect(askTraceLine(r)).toBe("Nemotron 3 Super on Nebius · read your circle's picks · skipped what you watched · nothing fit, so it says so · 3.0s");
+    expect(TV_NO_MATCH_HINT).toMatch(/ask a friend/);
+    const forced = await new MockApiClient({ latencyMs: [0, 0], scenario: 'ask-nomatch' }).ask('wcd_x', ['short']);
+    expect(forced).toMatchObject({ status: 'no_match', picks: [], closest: { title: 'The Quiet Orchard' } });
+  });
+  it('off topic (phone-only today) renders without picks; older answers without status still read as ok', async () => {
+    const r = await new MockApiClient({ latencyMs: [0, 0], scenario: 'ask-offtopic' }).ask('wcd_x', ['short']);
+    expect(r).toMatchObject({ status: 'off_topic', picks: [] });
+    expect(askBackdropTitle(r)).toBeUndefined();
+    expect(askTraceLine(r)).toMatch(/not a what-to-watch question/);
+    expect(askSourceLine({ source: 'fallback', status: 'off_topic' })).toBe('Checked by Gottawatch');
+    const ok = await new MockApiClient({ latencyMs: [0, 0] }).ask('wcd_x', ['short']);
+    expect(ok.status).toBe('ok');
+    expect(askBackdropTitle(ok)).toBe('Kestrel Bay');
+    expect(askBackdropTitle({ picks: ok.picks })).toBe('Kestrel Bay');
+  });
   it('429 and offline get their own copy; chips are short enough for one row', async () => {
     await expect(new MockApiClient({ latencyMs: [0, 0], scenario: 'ask-limit' }).ask('wcd_x', ['funny'])).rejects.toMatchObject({ status: 429 });
     expect(askErrorCopy(new ApiFailure('retryable', 'HTTP 429', 429))).toMatch(/few minutes/);
@@ -302,6 +325,7 @@ describe('Ask on the TV', () => {
     const f = vi.fn(async () => new Response(JSON.stringify({ answer: 'x', picks: [], source: 'fallback', trace: [] }), { status: 200 }));
     const r = await new LiveApiClient('', f as never).ask('wcd_x', ['light']);
     expect(r.source).toBe('fallback');
+    expect(r.status).toBe('ok'); // an older server without status parses as ok
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/ask');
     expect(JSON.parse(String(init.body))).toEqual({ query: '', chips: ['light'] });

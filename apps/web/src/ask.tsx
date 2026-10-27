@@ -2,7 +2,8 @@
 // friends' picks and your watch history, so every answer comes back with who sent it and their words.
 import { useEffect, useRef, useState } from 'react';
 import { failureKind, type ApiClient, type AskChip, type AskResult } from './api';
-import { ASK_CHIPS, ASK_EXAMPLES, askErrorCopy, askSourceLabel, askTraceRows, posterUrl, toggleChip } from './logic';
+import type { AskPick } from '@gottawatch/contract';
+import { ASK_CHIPS, ASK_EXAMPLES, ASK_NO_MATCH_HINT, ASK_TRY, askErrorCopy, askSourceLabel, askTraceRows, posterUrl, toggleChip } from './logic';
 
 type State = { k: 'idle' } | { k: 'asking'; slow: boolean } | { k: 'error'; msg: string } | { k: 'ok'; r: AskResult; asked: string };
 
@@ -113,42 +114,63 @@ export function AskPanel({ api, token, onWatched }: { api: ApiClient; token: str
             <button className="btn small" onClick={() => void ask()} disabled={!q.trim() && !chips.length}>Try again</button>
           </div>
         )}
-        {s.k === 'ok' && <AskAnswer r={s.r} asked={s.asked} onClear={reset} onWatched={onWatched} />}
+        {s.k === 'ok' && (
+          <AskAnswer
+            r={s.r}
+            asked={s.asked}
+            onClear={reset}
+            onWatched={onWatched}
+            onTry={(t) => {
+              setQ(t);
+              setChips([]);
+              void ask(t, []);
+            }}
+          />
+        )}
       </div>
     </section>
   );
 }
 
-function AskAnswer({ r, asked, onClear, onWatched }: { r: AskResult; asked: string; onClear: () => void; onWatched?: (recId: string) => void }) {
+export function AskAnswer({ r, asked, onClear, onWatched, onTry }: { r: AskResult; asked: string; onClear: () => void; onWatched?: (recId: string) => void; onTry: (q: string) => void }) {
   const [done, setDone] = useState<Set<string>>(new Set());
   const rows = askTraceRows(r.trace);
+  const status = r.status ?? 'ok';
+  const watched = (id: string) => {
+    setDone((d) => new Set(d).add(id));
+    onWatched?.(id);
+  };
   return (
-    <div className="ask-answer">
+    <div className={`ask-answer ask-${status.replace('_', '-')}`}>
       <p className="ask-for caption">For “{asked}”</p>
       <p className="ask-text">{r.answer}</p>
-      {r.picks.length > 0 && (
+      {status === 'ok' && r.picks.length > 0 && (
         <ol className="ask-picks">
           {r.picks.map((p, i) => (
             <li key={p.recId} className="ask-pick">
-              <img className="thumb" src={posterUrl(p.title, p.poster)} alt="" />
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="ask-rank caption">{i === 0 ? 'Best bet' : `Also good`}</div>
-                <div className="rowtitle">{p.title}</div>
-                <div className="caption">{[p.runtime ? `${p.runtime} min` : '', p.from.length ? `From ${p.from.join(' and ')}` : ''].filter(Boolean).join(' · ')}</div>
-                <p className="ask-reason">{p.reason}</p>
-                {p.quotes.map((qt) => <p key={qt} className="quote">“{qt}”</p>)}
-                {onWatched && (
-                  <button className="btn small" disabled={done.has(p.recId)} onClick={() => { setDone((d) => new Set(d).add(p.recId)); onWatched(p.recId); }}>
-                    {done.has(p.recId) ? 'Moved to Watched' : 'Watched it'}
-                  </button>
-                )}
-              </div>
+              <PickBody p={p} label={i === 0 ? 'Best bet' : 'Also good'} done={done.has(p.recId)} onWatched={onWatched && watched} />
             </li>
           ))}
         </ol>
       )}
+      {status === 'no_match' && r.closest && (
+        <div className="ask-pick ask-closest">
+          <PickBody p={r.closest} label="Closest, not an exact match" done={done.has(r.closest.recId)} onWatched={onWatched && watched} />
+        </div>
+      )}
+      {status === 'no_match' && <p className="ask-hint">{ASK_NO_MATCH_HINT}</p>}
+      {status !== 'ok' && (
+        <div className="ask-try">
+          <p className="caption">{status === 'off_topic' ? 'Try asking' : 'Or try'}</p>
+          <div className="chips">
+            {ASK_TRY.map((t) => (
+              <button key={t} type="button" className="chip" onClick={() => onTry(t)}>{t}</button>
+            ))}
+          </div>
+        </div>
+      )}
       <details className="ask-how">
-        <summary>How I picked this</summary>
+        <summary>{status === 'ok' ? 'How I picked this' : 'How I checked this'}</summary>
         <ul>
           {rows.map((row, i) => (
             <li key={i}><span>{row.text}</span>{row.meta && <span className="caption">{row.meta}</span>}</li>
@@ -157,9 +179,29 @@ function AskAnswer({ r, asked, onClear, onWatched }: { r: AskResult; asked: stri
         <p className="caption" style={{ margin: '8px 0 0' }}>Only your friends' picks and your watch history are used. Quotes are their exact words.</p>
       </details>
       <div className="ask-foot">
-        <span className="caption">{askSourceLabel(r.source)}</span>
+        <span className="caption">{askSourceLabel(r.source, status)}</span>
         <button className="linkbtn" onClick={onClear}>Clear</button>
       </div>
     </div>
+  );
+}
+
+function PickBody({ p, label, done, onWatched }: { p: AskPick; label: string; done: boolean; onWatched?: (recId: string) => void }) {
+  return (
+    <>
+      <img className="thumb" src={posterUrl(p.title, p.poster)} alt="" />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="ask-rank caption">{label}</div>
+        <div className="rowtitle">{p.title}</div>
+        <div className="caption">{[p.runtime ? `${p.runtime} min` : '', p.from.length ? `From ${p.from.join(' and ')}` : ''].filter(Boolean).join(' · ')}</div>
+        <p className="ask-reason">{p.reason}</p>
+        {p.quotes.map((qt) => <p key={qt} className="quote">“{qt}”</p>)}
+        {onWatched && (
+          <button className="btn small" disabled={done} onClick={() => onWatched(p.recId)}>
+            {done ? 'Moved to Watched' : 'Watched it'}
+          </button>
+        )}
+      </div>
+    </>
   );
 }

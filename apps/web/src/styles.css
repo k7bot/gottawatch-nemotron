@@ -147,6 +147,12 @@ body.sheet-open { overflow: hidden; }
 .ask-rank { text-transform: uppercase; letter-spacing: .08em; font-weight: 700; font-size: 11px; color: var(--accent); }
 .ask-pick:not(:first-child) .ask-rank { color: var(--text3); }
 .ask-reason { margin: 6px 0 2px; font-size: 15px; line-height: 21px; }
+.ask-closest { box-shadow: none; border: 1px dashed var(--s2); opacity: .92; }
+.ask-closest .ask-rank { color: var(--text3); }
+.ask-hint { margin: 10px 0 0; font-size: 15px; line-height: 21px; color: var(--text2); }
+.ask-try { margin-top: 14px; }
+.ask-try .caption { margin: 0 0 6px; }
+.ask-try .chips { margin-top: 0; }
 .ask-how { margin-top: 12px; border-top: 1px solid var(--s2); padding-top: 4px; }
 .ask-how summary { cursor: pointer; color: var(--text2); font-weight: 600; font-size: 14px; min-height: 40px; display: flex; align-items: center; list-style: none; }
 .ask-how summary::-webkit-details-marker { display: none; }

@@ -255,12 +255,21 @@ export function askErrorCopy(kind: string): string {
   return "Couldn't get an answer just now. Try again, or pick from the list below.";
 }
 
-/** Small honest label for where the answer came from. */
-export function askSourceLabel(source: string): string {
-  if (source === 'nemotron-agent') return 'Picked by Nemotron 3 Super on Nebius';
-  if (source === 'nemotron-fast') return 'Picked by Nemotron 3 Nano on Nebius';
+/** Small honest label for where the answer came from. With no picks, nothing was "picked". */
+export function askSourceLabel(source: string, status: string = 'ok'): string {
+  const verb = status === 'ok' ? 'Picked' : 'Checked';
+  if (source === 'nemotron-agent') return `${verb} by Nemotron 3 Super on Nebius`;
+  if (source === 'nemotron-fast') return `${verb} by Nemotron 3 Nano on Nebius`;
+  if (status === 'off_topic') return 'Checked by Gottawatch';
+  if (status === 'no_match') return 'Checked by keyword (the AI was busy)';
   return 'Picked by friend count (the AI was busy)';
 }
+
+/** Questions to offer when the last one was off topic or nothing fit: one tap asks again. */
+export const ASK_TRY = ['Something short and funny', 'Something we can all watch together', "What's the best movie my friends sent?"];
+
+/** The gentle next step under a "nothing fits" answer. */
+export const ASK_NO_MATCH_HINT = 'Know someone who has seen one? Ask them to send it your way.';
 
 const TOOL_COPY: Record<string, string> = {
   get_friend_picks: "Read your friends' picks and notes",
@@ -278,9 +287,12 @@ export function askTraceRows(trace: { kind: string; label: string; detail?: stri
       const what = t.detail === 'answer' ? 'wrote the answer' : t.detail === 'one-shot rerank' ? 'ranked the picks' : /tool call/.test(t.detail ?? '') ? 'decided what to look up' : 'thought';
       return { text: `${name} ${what}`, ...(ms ? { meta: ms } : {}) };
     }
+    if (t.label === 'grounding' && t.detail?.startsWith('status')) return { text: "Checked the answer against your friends' picks" };
     if (t.label === 'grounding') return { text: t.detail?.startsWith('dropped') ? 'Removed anything not backed by a friend' : "Checked every quote against your friends' notes" };
     if (t.label === 'fallback') return { text: 'Ranked by how many friends picked it' };
     const CHECKS: Record<string, string> = {
+      'off topic': "Not a what-to-watch question, so no picks",
+      'no match': "Nothing your friends sent fits, so it says so",
       nudge: "Reminded it to start from your friends' picks",
       'agent out of time': 'Took too long, so a faster model finished',
       'agent failed': 'The big model was busy',

@@ -17,9 +17,11 @@ export type MockScenario =
   | 'history' // two titles already watched (Watched screen)
   | 'history-error' // GET /seen fails
   | 'ask-limit' // POST /ask 429
-  | 'ask-error'; // POST /ask 500
+  | 'ask-error' // POST /ask 500
+  | 'ask-nomatch' // POST /ask: nothing in the circle fits (with a closest pick)
+  | 'ask-offtopic'; // POST /ask: off topic (phone free text; previews the TV state)
 
-export const MOCK_SCENARIOS: MockScenario[] = ['default', 'stub', 'fallback', 'nopick', 'empty', 'offline', 'unpaired', 'server-error', 'handoff', 'history', 'history-error', 'ask-limit', 'ask-error'];
+export const MOCK_SCENARIOS: MockScenario[] = ['default', 'stub', 'fallback', 'nopick', 'empty', 'offline', 'unpaired', 'server-error', 'handoff', 'history', 'history-error', 'ask-limit', 'ask-error', 'ask-nomatch', 'ask-offtopic'];
 
 export interface MockOptions {
   scenario?: string;
@@ -209,18 +211,38 @@ export class MockApiClient implements ApiClient {
           ...(kb ? [{ recId: kb.id, title: kb.title, reason: 'Priya and Sam both sent it, and the episodes are only 40 minutes.', quotes: ['start at ep 2'], from: ['Priya', 'Sam'], runtime: 40 }] : []),
           ...(qo ? [{ recId: qo.id, title: qo.title, reason: 'If you want one long story instead, Maya says this is it.', quotes: [], from: ['Maya'] }] : []),
         ];
+    const trace = [
+      { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: '2 tool call(s)', ms: 1300 },
+      { kind: 'tool', label: 'get_friend_picks', detail: '{}', ms: 2 },
+      { kind: 'tool', label: 'get_watch_history', detail: '{}', ms: 1 },
+      { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: 'answer', ms: 1700 },
+    ];
+    if (this.scenario === 'ask-offtopic') {
+      return AskResponse.parse({
+        status: 'off_topic',
+        answer: "I can only help pick something to watch from your friends' recommendations. Try asking for something short and funny, or tap a mood below.",
+        picks: [], source: 'nemotron-agent', model: 'nvidia/nemotron-3-super-120b-a12b',
+        trace: [...trace.slice(0, 1), { kind: 'check', label: 'off topic', detail: 'not a what-to-watch question; no picks' }],
+      });
+    }
+    if (this.scenario === 'ask-nomatch' || !picks.length) {
+      const near = this.scenario === 'ask-nomatch' ? qo ?? kb : kb;
+      return AskResponse.parse({
+        status: 'no_match',
+        answer: chips.includes('movie') ? "None of your circle's picks are a movie you haven't seen yet." : "Nothing your circle sent fits that yet.",
+        picks: [],
+        ...(near ? { closest: { recId: near.id, title: near.title, reason: near === kb ? 'A show, not a movie, but the episodes are only 40 minutes.' : 'The nearest thing in your list, though not quite what you asked for.', quotes: [], from: near === kb ? ['Priya', 'Sam'] : ['Maya'] } } : {}),
+        source: 'nemotron-agent', model: 'nvidia/nemotron-3-super-120b-a12b',
+        trace: [...trace, { kind: 'check', label: 'no match', detail: near ? `closest: ${near.title}` : 'nothing close' }],
+      });
+    }
     return AskResponse.parse({
-      answer: picks.length ? `${picks[0]!.title} is your best bet tonight.` : 'Nothing in your list fits that. Try another mood.',
+      status: 'ok',
+      answer: `${picks[0]!.title} is your best bet tonight.`,
       picks,
       source: 'nemotron-agent',
       model: 'nvidia/nemotron-3-super-120b-a12b',
-      trace: [
-        { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: '2 tool call(s)', ms: 1300 },
-        { kind: 'tool', label: 'get_friend_picks', detail: '{}', ms: 2 },
-        { kind: 'tool', label: 'get_watch_history', detail: '{}', ms: 1 },
-        { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: 'answer', ms: 1700 },
-        { kind: 'check', label: 'grounding', detail: `${picks.length} pick(s) grounded` },
-      ],
+      trace: [...trace, { kind: 'check', label: 'grounding', detail: `${picks.length} pick(s) grounded` }],
     });
   }
 

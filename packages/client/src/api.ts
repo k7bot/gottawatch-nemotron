@@ -355,6 +355,24 @@ export class MockApiClient implements ApiClient {
     if (this.scenario === 'offline') throw new ApiFailure('offline', 'Network error (mock)');
     if (this.scenario === 'ask-limit') throw new ApiFailure('rate_limited', 'HTTP 429 (mock)', 429);
     if (this.scenario === 'ask-error') throw new ApiFailure('server', 'HTTP 500 (mock)', 500);
+    const trace = (label: string, detail: string) => [
+      { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: '1 tool call(s)', ms: 900 },
+      { kind: 'tool', label: 'get_friend_picks', detail: '{}', ms: 2 },
+      { kind: 'model', label: 'nemotron-3-super-120b-a12b', detail: 'answer', ms: 800 },
+      { kind: 'check', label: 'grounding', detail: `status ${label.replace(' ', '_')}` },
+      { kind: 'check', label, detail },
+    ];
+    const base = { source: 'nemotron-agent', model: 'nvidia/nemotron-3-super-120b-a12b' };
+    if (/capital|weather|asdf|\?\?\?/i.test(query)) {
+      return AskResponse.parse({ ...base, status: 'off_topic', answer: "I can only help pick something to watch from your friends' recommendations. Try asking for something short and funny, or tap a mood below.", picks: [], trace: trace('off topic', 'not a what-to-watch question; no picks') });
+    }
+    if (/horror|korean|western|tom hanks/i.test(query)) {
+      return AskResponse.parse({
+        ...base, status: 'no_match', answer: "None of your friends' picks are a horror movie yet.", picks: [],
+        closest: { recId: 'm3', title: 'The Quiet Orchard', reason: 'The one movie your friends sent. It is a slow, sad one, not scary.', quotes: [], from: ['Maya'] },
+        trace: trace('no match', 'closest: The Quiet Orchard'),
+      });
+    }
     const short = chips.includes('short') || /short|quick|tired/i.test(query);
     const picks = short
       ? [{ recId: 'm1', title: 'Kestrel Bay', reason: '40-minute episodes, and Sam says to start at episode 2.', quotes: ['Start at ep 2'], from: ['Sam'], runtime: 40 }]

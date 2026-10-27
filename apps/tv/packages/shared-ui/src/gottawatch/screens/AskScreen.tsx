@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { DefaultFocus, SpatialNavigationNode, SpatialNavigationRoot } from 'react-tv-space-navigation';
 import { ApiFailure, type ApiClient } from '../core/api';
-import { askErrorCopy, askTraceLine, TV_ASK_CHIPS, type AskChip, type AskResult } from '../core/ask';
+import { askBackdropTitle, askErrorCopy, askTraceLine, TV_ASK_CHIPS, TV_NO_MATCH_HINT, TV_OFF_TOPIC_HINT, type AskChip, type AskResult } from '../core/ask';
 import type { TitleCard } from '../core/home';
 import { Button } from '../ui/Button';
 import { Focusable } from '../ui/Focusable';
@@ -57,7 +57,7 @@ export function AskScreen({ api, token, active, cards, state, setState, onBack, 
   );
 
   const current = state.k === 'idle' ? undefined : state.chip;
-  const bg = state.k === 'ok' ? state.r.picks[0]?.title : undefined;
+  const bg = state.k === 'ok' ? askBackdropTitle(state.r) : undefined;
 
   return (
     <Screen>
@@ -123,14 +123,23 @@ const CARD_W = 552;
 
 function Answer({ r, cards, onOpen }: { r: AskResult; cards: TitleCard[]; onOpen: (c: TitleCard) => void }) {
   const find = (recId: string, title: string) => cards.find((c) => c.recIds.includes(recId)) ?? cards.find((c) => c.title === title);
+  const status = r.status ?? 'ok';
+  // ok: the picks (first one is the best bet). no_match: at most the closest one, plainly labeled. off_topic: none.
+  const shown = status === 'ok' ? r.picks : status === 'no_match' && r.closest ? [r.closest] : [];
+  const label = (i: number) => (status !== 'ok' ? 'CLOSEST, NOT AN EXACT MATCH' : i === 0 ? 'BEST BET' : 'ALSO GOOD');
+  const lead = (i: number) => status === 'ok' && i === 0;
+  // The TV has no keyboard, so an off-topic answer only arrives from a phone-style query; keep the copy TV-true.
+  const answer = status === 'off_topic' ? 'I can only help pick something to watch.' : r.answer;
+  const hint = status === 'no_match' ? TV_NO_MATCH_HINT : status === 'off_topic' ? TV_OFF_TOPIC_HINT : undefined;
   return (
     <View style={{ flex: 1 }}>
-      <Text numberOfLines={2} style={[type.quote, { fontFamily: fonts.display, fontSize: px(40), lineHeight: px(52), maxWidth: px(1500) }]}>{r.answer}</Text>
-      {r.picks.length > 0 && (
+      <Text numberOfLines={2} style={[type.quote, { fontFamily: fonts.display, fontSize: px(40), lineHeight: px(52), maxWidth: px(1500) }]}>{answer}</Text>
+      {hint && <Text style={[type.body, { marginTop: px(10), maxWidth: px(1500) }]}>{hint}</Text>}
+      {shown.length > 0 && (
         <View style={{ marginTop: px(28) }}>
           <SpatialNavigationNode orientation="horizontal">
             <View style={{ flexDirection: 'row' }}>
-              {r.picks.map((p, i) => {
+              {shown.map((p, i) => {
                 const card = find(p.recId, p.title);
                 return (
                   <View key={p.recId} style={{ marginRight: px(32) }}>
@@ -146,12 +155,12 @@ function Answer({ r, cards, onOpen }: { r: AskResult; cards: TitleCard[]; onOpen
                             borderRadius: px(layout.radiusPanel),
                             backgroundColor: focused ? colors.surface2 : colors.surface1,
                             borderWidth: px(3),
-                            borderColor: i === 0 ? colors.accent : 'transparent',
+                            borderColor: lead(i) ? colors.accent : status === 'ok' ? 'transparent' : colors.surface2,
                           }}
                         >
                           <Poster title={p.title} url={p.poster} width={140} height={210} />
                           <View style={{ flex: 1, alignSelf: 'stretch', marginLeft: px(22) }}>
-                            <Text style={[type.label, { color: i === 0 ? colors.accent : colors.text3, fontFamily: fonts.bold, letterSpacing: px(2) }]}>{i === 0 ? 'BEST BET' : 'ALSO GOOD'}</Text>
+                            <Text style={[type.label, { color: lead(i) ? colors.accent : colors.text3, fontFamily: fonts.bold, letterSpacing: px(2) }]}>{label(i)}</Text>
                             <Text numberOfLines={1} style={[type.title, { marginTop: px(4), fontSize: px(32), lineHeight: px(40) }]}>{p.title}</Text>
                             <Text numberOfLines={1} style={[type.label, { marginTop: px(2) }]}>
                               {[p.runtime ? `${p.runtime} min` : '', p.from.length ? `From ${p.from.join(' & ')}` : ''].filter(Boolean).join(' · ')}

@@ -255,9 +255,18 @@ export const AskTraceStep = z.object({
   detail: z.string().optional(),
   ms: z.number().int().nonnegative().optional(),
 });
+/**
+ * How the question went. "ok": picks that fit. "no_match": a real what-to-watch question, but nothing
+ * friends sent fits it (picks is empty; `closest` may hold the nearest one, clearly not a match).
+ * "off_topic": not about what to watch (picks empty). Missing means "ok" (older servers).
+ */
+export const AskStatus = z.enum(["ok", "no_match", "off_topic"]);
 export const AskResponse = z.object({
+  status: AskStatus.default("ok"),
   answer: z.string().min(1).max(400),
   picks: z.array(AskPick).max(3),
+  /** Only with status "no_match": the nearest friend pick, shown as "not an exact match". */
+  closest: AskPick.optional(),
   source: AskSource,
   model: z.string().optional(),
   trace: z.array(AskTraceStep),
@@ -266,6 +275,7 @@ export type AskChip = z.infer<typeof AskChip>;
 export type AskRequest = z.infer<typeof AskRequest>;
 export type AskPick = z.infer<typeof AskPick>;
 export type AskSource = z.infer<typeof AskSource>;
+export type AskStatus = z.infer<typeof AskStatus>;
 export type AskTraceStep = z.infer<typeof AskTraceStep>;
 export type AskResponse = z.infer<typeof AskResponse>;
 
