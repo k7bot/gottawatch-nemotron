@@ -62,6 +62,12 @@ describe("single-origin server", () => {
     expect(r.headers.get("access-control-allow-origin")).toBeNull(); // same origin, no CORS
   });
 
+  it("serves /health as an alias (Cloud Run reserves /healthz)", async () => {
+    const r = await fetch(`${base}/health`);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true });
+  });
+
   it("serves the PWA with SPA fallback and the TV app under /tv/", async () => {
     const home = await fetch(`${base}/`, { headers: html });
     expect(await home.text()).toContain("<title>phone");

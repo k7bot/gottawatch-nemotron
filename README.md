@@ -51,7 +51,7 @@ the TV export (`cd apps/tv && EXPO_PUBLIC_API_URL=same-origin scripts/export-web
 
 ### Hosting
 
-The demo runs on Northflank's free Sandbox with a persistent volume. See [deploy/northflank/README.md](deploy/northflank/README.md).
+The live demo runs on Google Cloud Run (one container, state in a Cloud Storage volume, Nebius key in Secret Manager). See [deploy/cloudrun/README.md](deploy/cloudrun/README.md). An unused alternative for Northflank is in [deploy/northflank/](deploy/northflank/README.md).
 
 ## Repo map
 

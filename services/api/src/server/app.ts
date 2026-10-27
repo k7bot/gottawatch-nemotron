@@ -37,7 +37,7 @@ export interface ServerOptions {
   api: (req: ApiRequest) => Promise<ApiResponse | undefined>;
   web?: StaticSite;
   tv?: StaticSite;
-  /** Liveness/readiness details for GET /healthz (no secrets). */
+  /** Liveness/readiness details for GET /healthz and /health (no secrets). */
   health?: () => Record<string, unknown>;
   log?: (line: string) => void;
 }
@@ -73,7 +73,8 @@ export function createRequestListener(o: ServerOptions) {
     try {
       const url = new URL(req.url ?? "/", "http://local");
       path = url.pathname;
-      if (path === "/healthz" && (method === "GET" || method === "HEAD")) {
+      // /health is the same check: Cloud Run's front end reserves /healthz on run.app URLs.
+      if ((path === "/healthz" || path === "/health") && (method === "GET" || method === "HEAD")) {
         return send(200, { "content-type": "application/json", "cache-control": "no-store" }, JSON.stringify({ ok: true, ...(o.health?.() ?? {}) }));
       }
       if (matchRoute(method, path)) {
@@ -100,7 +101,7 @@ export function createRequestListener(o: ServerOptions) {
       if (!res.headersSent) send(500, { "content-type": "application/json" }, jsonError(500, "internal", "Something went wrong"));
       else res.end();
     } finally {
-      if (path !== "/healthz") log(`${method} ${redactPath(path)} ${status} ${Date.now() - started}ms`);
+      if (path !== "/healthz" && path !== "/health") log(`${method} ${redactPath(path)} ${status} ${Date.now() - started}ms`);
     }
   };
 }
