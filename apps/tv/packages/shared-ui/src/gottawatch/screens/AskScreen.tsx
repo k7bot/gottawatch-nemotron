@@ -8,6 +8,7 @@ import { ApiFailure, type ApiClient } from '../core/api';
 import {
   ASK_QUERY_MAX,
   askBackdropTitle,
+  askFocusAfter,
   askedLine,
   askErrorCopy,
   askTraceLine,
@@ -51,7 +52,6 @@ export function AskScreen({ api, token, active, cards, state, setState, onBack, 
   const [draft, setDraft] = useState('');
   const seq = useRef(0);
   const tileRef = useRef<SpatialNavigationNodeRef>(null);
-  const firstChipRef = useRef<SpatialNavigationNodeRef>(null);
   const inputRef = useRef<TextInput>(null);
 
   const stopTyping = useCallback(() => {
@@ -85,8 +85,8 @@ export function AskScreen({ api, token, active, cards, state, setState, onBack, 
         const r = input.query ? await api.ask(token, [], input.query) : await api.ask(token, [input.chip!]);
         if (n !== seq.current) return;
         setState({ k: 'ok', input, r });
-        // Not a what-to-watch question: send the viewer back to the moods.
-        if (r.status === 'off_topic') later(() => firstChipRef.current?.focus());
+        // Typed question (ok, no_match or off_topic): keep focus on the tile so OK rephrases.
+        if (askFocusAfter(input) === TYPED) later(() => tileRef.current?.focus());
       } catch (e) {
         if (e instanceof ApiFailure && e.kind === 'unauthorized') return onUnauthorized();
         if (n === seq.current) setState({ k: 'error', input, msg: askErrorCopy(e) });
@@ -129,7 +129,7 @@ export function AskScreen({ api, token, active, cards, state, setState, onBack, 
               <SpatialNavigationNode orientation="horizontal">
                 <View style={{ flexDirection: 'row' }}>
                   {TV_ASK_CHIPS.map((c, i) => {
-                    const btn = <Button ref={i === 0 ? firstChipRef : undefined} label={c.label} variant={current === c.id ? 'primary' : 'secondary'} onSelect={() => void ask({ chip: c.id })} />;
+                    const btn = <Button label={c.label} variant={current === c.id ? 'primary' : 'secondary'} onSelect={() => void ask({ chip: c.id })} />;
                     return (
                       <View key={c.id} style={{ marginRight: px(20) }}>
                         <DefaultFocus enable={current ? current === c.id : i === 0}>{btn}</DefaultFocus>

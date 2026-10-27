@@ -276,7 +276,7 @@ describe('greeting uses the household zone, not the device clock zone', () => {
   });
 });
 
-import { ASK_QUERY_MAX, askBackdropTitle, askedLine, askErrorCopy, askSourceLine, askTraceLine, typedQuery, typingHint, TV_ASK_CHIPS, TV_NO_MATCH_HINT, TV_OFF_TOPIC_HINT } from '../ask';
+import { ASK_QUERY_MAX, askBackdropTitle, askFocusAfter, askedLine, askErrorCopy, askSourceLine, askTraceLine, typedQuery, typingHint, TV_ASK_CHIPS, TV_NO_MATCH_HINT, TV_OFF_TOPIC_HINT } from '../ask';
 
 describe('Ask on the TV', () => {
   it('mock ask returns contract-valid picks from the feed, movie chip narrows to the movie', async () => {
@@ -344,7 +344,12 @@ describe('Ask on the TV', () => {
     expect(none).toMatchObject({ status: 'no_match', picks: [], closest: { title: 'The Quiet Orchard' } });
     const off = await m.ask('wcd_x', [], "what's the capital of France");
     expect(off).toMatchObject({ status: 'off_topic', picks: [] });
-    expect(TV_OFF_TOPIC_HINT).toMatch(/mood above/);
+    expect(TV_OFF_TOPIC_HINT).toBe('Press OK to rephrase, or pick a mood.');
+  });
+  it('after an answer, focus stays on what asked: the typed tile (any status) or the chip', () => {
+    expect(askFocusAfter({ query: "what's the capital of France" })).toBe('typed');
+    expect(askFocusAfter({ query: 'a Korean horror movie' })).toBe('typed');
+    expect(askFocusAfter({ chip: 'short' })).toBe('short');
   });
   it('live client sends a typed question as the query with no chips', async () => {
     const f = vi.fn(async () => new Response(JSON.stringify({ status: 'off_topic', answer: 'x', picks: [], source: 'nemotron-agent', trace: [] }), { status: 200 }));

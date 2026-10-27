@@ -26,11 +26,17 @@ export function askSourceLine(r: Pick<AskResult, 'source'> & { status?: AskResul
 
 /** Under a "nothing fits" answer: where to go next, without a keyboard. */
 export const TV_NO_MATCH_HINT = 'Try another mood, or ask a friend to send you one from their phone.';
-/** Under an off-topic answer (a typed question that isn't about what to watch). Focus returns to the moods. */
-export const TV_OFF_TOPIC_HINT = 'Pick a mood above, or type a question about what to watch.';
+/** Under an off-topic answer (a typed question that isn't about what to watch). Focus stays on "Type your own…". */
+export const TV_OFF_TOPIC_HINT = 'Press OK to rephrase, or pick a mood.';
 
 /** What was asked: a mood chip, or the household's own words (sent as the query, no chips). */
 export type AskInput = { chip: AskChip; query?: undefined } | { query: string; chip?: undefined };
+
+/** Where remote focus rests once an answer arrives: on the control that asked (a typed question keeps the
+ * "Type your own…" tile, whatever the status, so OK reopens the field to rephrase). */
+export function askFocusAfter(input: AskInput): 'typed' | AskChip {
+  return input.query ? 'typed' : input.chip!;
+}
 
 /** The typed question to send, or undefined when there is nothing to send (empty submit does nothing). */
 export function typedQuery(draft: string): string | undefined {
