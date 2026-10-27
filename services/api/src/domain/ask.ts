@@ -320,7 +320,7 @@ export function groundAnswer(
 }
 
 export const OFF_TOPIC_ANSWER =
-  "I can only help pick something to watch from your friends' recommendations. Try asking for something short and funny, or tap a mood below.";
+  "I can only help pick something to watch from your friends' recommendations. Try one of the questions below, or tap a mood.";
 export const NO_MATCH_ANSWER = "None of your friends' picks fit that yet.";
 
 function groundingDetail(g: Grounded): string {

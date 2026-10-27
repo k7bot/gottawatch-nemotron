@@ -220,7 +220,7 @@ export class MockApiClient implements ApiClient {
     if (this.scenario === 'ask-offtopic') {
       return AskResponse.parse({
         status: 'off_topic',
-        answer: "I can only help pick something to watch from your friends' recommendations. Try asking for something short and funny, or tap a mood below.",
+        answer: "I can only help pick something to watch from your friends' recommendations. Try one of the questions below, or tap a mood.",
         picks: [], source: 'nemotron-agent', model: 'nvidia/nemotron-3-super-120b-a12b',
         trace: [...trace.slice(0, 1), { kind: 'check', label: 'off topic', detail: 'not a what-to-watch question; no picks' }],
       });

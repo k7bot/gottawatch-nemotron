@@ -364,7 +364,7 @@ export class MockApiClient implements ApiClient {
     ];
     const base = { source: 'nemotron-agent', model: 'nvidia/nemotron-3-super-120b-a12b' };
     if (/capital|weather|asdf|\?\?\?/i.test(query)) {
-      return AskResponse.parse({ ...base, status: 'off_topic', answer: "I can only help pick something to watch from your friends' recommendations. Try asking for something short and funny, or tap a mood below.", picks: [], trace: trace('off topic', 'not a what-to-watch question; no picks') });
+      return AskResponse.parse({ ...base, status: 'off_topic', answer: "I can only help pick something to watch from your friends' recommendations. Try one of the questions below, or tap a mood.", picks: [], trace: trace('off topic', 'not a what-to-watch question; no picks') });
     }
     if (/horror|korean|western|tom hanks/i.test(query)) {
       return AskResponse.parse({
