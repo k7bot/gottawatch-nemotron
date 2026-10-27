@@ -206,7 +206,7 @@ function quotedSegments(text: string): string[] {
 /** Normalized text with punctuation removed, for "does the answer just repeat the question" checks. */
 const bare = (s: string) => norm(s).replace(/[^\p{L}\p{N} ]+/gu, "").replace(/\s+/g, " ").trim();
 
-type Grounded = { status?: AskStatus; answer?: string; picks: AskPick[]; closest?: AskPick; dropped: string[] };
+type Grounded = { status?: AskStatus; answer?: string; picks: AskPick[]; closest?: AskPick; dropped: string[]; offered?: number };
 
 /**
  * The grounding check. Keeps only picks whose recId is a real unseen candidate; keeps only quotes
@@ -316,7 +316,7 @@ export function groundAnswer(
   // The household never sees "the list" the model was given; talk about their friends' picks.
   if (answer) answer = answer.replace(/\b(?:these|the|those) (?:titles|options|items)\b/gi, "your friends' picks").replace(/\bthe list\b/gi, "your friends' picks");
   if (answer && answer.length > ANSWER_MAX) answer = answer.slice(0, ANSWER_MAX - 1).replace(/\s+\S*$/, "") + "…";
-  return { ...(status ? { status } : {}), ...(answer ? { answer } : {}), picks, ...(closest ? { closest } : {}), dropped };
+  return { ...(status ? { status } : {}), ...(answer ? { answer } : {}), picks, ...(closest ? { closest } : {}), dropped, offered: list.length };
 }
 
 export const OFF_TOPIC_ANSWER =
@@ -433,7 +433,16 @@ function finish(ctx: Ctx, g: Grounded, base: Pick<AskResponse, "source" | "model
     ctx.trace.push({ kind: "check", label: "no match", detail: g.closest ? `closest: ${g.closest.title}` : "nothing close" });
     return { status: "no_match", answer: g.answer ?? NO_MATCH_ANSWER, picks: [], ...(g.closest ? { closest: g.closest } : {}), ...base, trace: ctx.trace };
   }
-  if (!g.picks.length) return undefined;
+  if (!g.picks.length) {
+    // Measured live: Super read the picks, then answered with an empty list and no status. Offering
+    // nothing after reading them is a "nothing fits"; say so plainly instead of asking another model
+    // to stretch. (Picks it offered that grounding then dropped still go to the next step.)
+    if (opts.readPicks && g.offered === 0 && opts.typedQuery) {
+      ctx.trace.push({ kind: "check", label: "no match", detail: "no picks offered after reading friend picks" });
+      return { status: "no_match", answer: NO_MATCH_ANSWER, picks: [], ...base, trace: ctx.trace };
+    }
+    return undefined;
+  }
   return { status: "ok", answer: g.answer ?? defaultAnswer(g.picks), picks: g.picks, ...base, trace: ctx.trace };
 }
 

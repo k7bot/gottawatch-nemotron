@@ -241,6 +241,28 @@ describe("Ask Gottawatch: relevance (off topic, nothing fits)", () => {
     expect(res.trace.at(-1)).toMatchObject({ label: "no match", detail: "closest: The Quiet Orchard" });
   });
 
+  it("agent reads the picks, then offers none without a status (seen live) → no_match, not a Nano stretch", async () => {
+    const { chat, calls } = scripted([
+      { toolCalls: [toolCall("get_friend_picks", {})] },
+      { content: JSON.stringify({ answer: "Nothing like that here.", picks: [] }) },
+    ]);
+    const res = AskResponse.parse(await askGottawatch(deps(chat), HH, { query: "A Korean horror movie from the 1980s", chips: [] }));
+    expect(res).toMatchObject({ status: "no_match", answer: NO_MATCH_ANSWER, picks: [], source: "nemotron-agent" });
+    expect(calls).toHaveLength(2); // no Nano call
+    expect(res.trace.at(-1)).toMatchObject({ label: "no match", detail: "no picks offered after reading friend picks" });
+  });
+
+  it("offered picks that all fail grounding still go to the next step (not a no_match)", async () => {
+    const { chat, calls } = scripted([
+      { toolCalls: [toolCall("get_friend_picks", {})] },
+      { content: JSON.stringify({ status: "ok", answer: "Try this.", picks: [{ recId: "made-up", reason: "Great.", quotes: [] }] }) },
+      { content: JSON.stringify({ status: "ok", answer: "Saltwater Static it is.", picks: [{ recId: ids.static, reason: "Sam says it is dumb and delightful.", quotes: ["dumb and delightful"] }] }) },
+    ]);
+    const res = AskResponse.parse(await askGottawatch(deps(chat), HH, { query: "something silly", chips: [] }));
+    expect(res).toMatchObject({ status: "ok", source: "nemotron-fast", picks: [{ title: "Saltwater Static" }] });
+    expect(calls).toHaveLength(3);
+  });
+
   it("no_match is only believed after reading friend picks; off_topic only for typed text", async () => {
     // Claims no_match without looking → nudged, then grounds real picks.
     const a = scripted([
