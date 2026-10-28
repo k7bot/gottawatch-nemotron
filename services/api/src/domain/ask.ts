@@ -352,6 +352,25 @@ const GENRES: { g: string; re: RegExp; match: string }[] = [
   { g: "war", re: /\bwar (movie|film|show|drama)/, match: "war" },
 ];
 
+/** Minutes the question caps length at: "under 30 minutes" → 30, "short" / "quick" → 45 (the Short chip's wording). */
+export function askedMaxRuntime(question: string): number | undefined {
+  const q = question.toLowerCase();
+  const m = q.match(/under (?:about )?(\d{1,3})\s*(?:min|minutes)/);
+  return m ? Number(m[1]) : /\b(short|quick)\b/.test(q) ? 45 : undefined;
+}
+
+/**
+ * Typed questions that are plainly about choosing something to watch. A model may never call one of
+ * these off topic (measured live: Super read only the watch history, then called "something short
+ * and funny for a weeknight" off topic after the nudge). Genuine off-topic questions ("what's the
+ * capital of France?") contain none of these words, so the model's off_topic still stands for them.
+ */
+const WATCH_WORDS =
+  /\b(watch\w*|show|shows|series|episodes?|movies?|films?|tv|telly|binge\w*|stream\w*|tonight|weeknight|weekend|date night|movie night|cozy|cosy|bingeable|recommend\w*|suggest\w*|picks?|sent|send|seen|funny|comed\w*|laugh\w*|short|quick|long|light|easy|intense|gripping|sad|cry|scary|creepy|spooky|kids|family|together|mood|documentar\w*|anime|animated|cartoon|sitcom|thriller|drama|horror|romance|romantic|rom-?com|sci-?fi|mystery|crime|action|fantasy|western|musical|minutes|mins|hours?)\b/;
+export function looksWatchRelated(query: string): boolean {
+  return WATCH_WORDS.test(norm(query));
+}
+
 /**
  * Keyword facets used by the deterministic fallback (no model): length, movie or show, genres.
  * Returns the candidates meeting every facet it recognized, and the facets nothing met.
@@ -365,8 +384,7 @@ export function heuristicMatch(cands: Candidate[], input: AskInput): { matches: 
     if (next.length) out = next;
     else unmet.push(label);
   };
-  const m = q.match(/under (?:about )?(\d{1,3})\s*(?:min|minutes)/);
-  const maxRt = m ? Number(m[1]) : /\b(short|quick)\b/.test(q) ? 45 : undefined;
+  const maxRt = askedMaxRuntime(q);
   if (maxRt) apply(`under ${maxRt} minutes`, (c) => c.runtime !== undefined && c.runtime <= maxRt);
   if (/\b(movie|movies|film|films)\b/.test(q)) apply("a movie", (c) => c.mediaType === "movie");
   else if (/\b(tv|shows?|series|episodes?)\b/.test(q.replace(/\bshow (me|us)\b/g, ""))) apply("a show", (c) => c.mediaType === "tv");
@@ -422,9 +440,13 @@ const typed = (q: string) => q.split(";")[0]!.trim();
  * no_match is only believed after the model actually read the friend picks; off_topic only when the
  * household typed something (chips alone are always a watch question).
  */
-function finish(ctx: Ctx, g: Grounded, base: Pick<AskResponse, "source" | "model">, opts: { readPicks: boolean; typedQuery: boolean }): AskResponse | undefined {
+function finish(ctx: Ctx, g: Grounded, base: Pick<AskResponse, "source" | "model">, opts: { readPicks: boolean; typedQuery: boolean; question: string }): AskResponse | undefined {
   if (g.status === "off_topic") {
     if (!opts.typedQuery) return undefined;
+    if (looksWatchRelated(typed(opts.question))) {
+      ctx.trace.push({ kind: "check", label: "off topic rejected", detail: "it is a what-to-watch question" });
+      return undefined;
+    }
     ctx.trace.push({ kind: "check", label: "off topic", detail: "not a what-to-watch question; no picks" });
     return { status: "off_topic", answer: OFF_TOPIC_ANSWER, picks: [], ...base, trace: ctx.trace };
   }
@@ -443,7 +465,26 @@ function finish(ctx: Ctx, g: Grounded, base: Pick<AskResponse, "source" | "model
     }
     return undefined;
   }
-  return { status: "ok", answer: g.answer ?? defaultAnswer(g.picks), picks: g.picks, ...base, trace: ctx.trace };
+  const { picks, answer } = respectLength(ctx, g.picks, g.answer, opts.question);
+  return { status: "ok", answer: answer ?? defaultAnswer(picks), picks, ...base, trace: ctx.trace };
+}
+
+/**
+ * "Short" means short: when the question caps length and at least one pick fits it, picks over the
+ * cap are dropped (measured live: "something short and funny" got a 103-minute movie alongside two
+ * 22-26 minute shows). If none fits, the picks stay as the model chose them. An answer that names a
+ * dropped title or counts the picks is replaced with the plain one.
+ */
+function respectLength(ctx: Ctx, picks: AskPick[], answer: string | undefined, question: string): { picks: AskPick[]; answer: string | undefined } {
+  const max = askedMaxRuntime(question);
+  if (!max) return { picks, answer };
+  const fits = (p: AskPick) => p.runtime !== undefined && p.runtime <= max;
+  const long = picks.filter((p) => p.runtime !== undefined && p.runtime > max);
+  if (!long.length || !picks.some(fits)) return { picks, answer };
+  const kept = picks.filter((p) => !long.includes(p));
+  ctx.trace.push({ kind: "check", label: "length", detail: `dropped ${long.map((p) => `${p.title} (${p.runtime} min)`).join(", ")}: over ${max} min` });
+  const stale = answer && (long.some((p) => bare(answer).includes(bare(p.title))) || /\b(two|three|both|2|3)\b/i.test(answer));
+  return { picks: kept, answer: stale ? undefined : answer };
 }
 
 async function runAgent(ctx: Ctx, question: string, deadline: number, typedQuery: boolean): Promise<AskResponse | undefined> {
@@ -476,8 +517,15 @@ async function runAgent(ctx: Ctx, question: string, deadline: number, typedQuery
     });
     ctx.trace.push({ kind: "model", label: model.split("/").pop()!, detail: out.toolCalls.length ? `${out.toolCalls.length} tool call(s)` : "answer", ms: out.ms });
     if (out.toolCalls.length) {
-      messages.push({ role: "assistant", content: out.content ?? "", tool_calls: out.toolCalls });
-      for (const tc of out.toolCalls.slice(0, 4)) {
+      // Read the friend picks before the agent can conclude: if its tool round skipped them, add the
+      // call ourselves (measured live: Super read only the watch history, then answered with nothing).
+      const calls = out.toolCalls.slice(0, 4);
+      if (!sawFriendPicks && !calls.some((tc) => tc.function.name === "get_friend_picks")) {
+        calls.push({ id: `auto-friend-picks-${round}`, type: "function", function: { name: "get_friend_picks", arguments: "{}" } });
+        ctx.trace.push({ kind: "check", label: "friend picks", detail: "added get_friend_picks to the agent's tool round" });
+      }
+      messages.push({ role: "assistant", content: out.content ?? "", tool_calls: [...calls, ...out.toolCalls.slice(4)] });
+      for (const tc of calls) {
         const t0 = Date.now();
         if (tc.function.name === "get_friend_picks") sawFriendPicks = true;
         const result = await runTool(ctx, tc.function.name, tc.function.arguments);
@@ -490,11 +538,11 @@ async function runAgent(ctx: Ctx, question: string, deadline: number, typedQuery
     }
     const g = groundAnswer(firstJsonObject(out.content), ctx.candidates, question);
     ctx.trace.push({ kind: "check", label: "grounding", detail: groundingDetail(g) });
-    const done = finish(ctx, g, { source: "nemotron-agent", model }, { readPicks: sawFriendPicks, typedQuery });
+    const done = finish(ctx, g, { source: "nemotron-agent", model }, { readPicks: sawFriendPicks, typedQuery, question });
     if (done) return done;
     // Measured: the agent sometimes answers after only reading watch history, or in plain prose
     // (e.g. it answers a trivia question). If it never looked at the friend picks, send it back once
-    // (if rounds remain) to either flag the question as off topic or read the picks; otherwise give up.
+    // (if rounds remain) to read the picks; otherwise give up and let Nano (which sees every pick) try.
     if (sawFriendPicks || nudged || round >= ASK_MAX_ROUNDS - 1) return undefined;
     nudged = true;
     nudgeRound = round + 1;
@@ -502,7 +550,7 @@ async function runAgent(ctx: Ctx, question: string, deadline: number, typedQuery
     messages.push({
       role: "user",
       content: typedQuery
-        ? 'Reply in the JSON format only. If the message is not about choosing something to watch, reply {"status":"off_topic","answer":"","picks":[]}. Otherwise call get_friend_picks now and recommend only titles from it, by recId (or status no_match if none fits).'
+        ? "You did not call get_friend_picks. Call it now, then reply in the JSON format only and recommend only titles from it, by recId (or status no_match if none of them fits)."
         : "You did not call get_friend_picks. Call it now and recommend only titles from it, by recId.",
     });
     ctx.trace.push({ kind: "check", label: "nudge", detail: "asked the agent to read friend picks" });
@@ -542,7 +590,7 @@ async function runFast(ctx: Ctx, question: string, deadline: number, typedQuery:
   const g = groundAnswer(firstJsonObject(out.content), ctx.candidates, question);
   ctx.trace.push({ kind: "check", label: "grounding", detail: groundingDetail(g) });
   // The one-shot model sees every friend pick in its prompt, so a no_match from it is informed.
-  return finish(ctx, g, { source: "nemotron-fast", model }, { readPicks: true, typedQuery });
+  return finish(ctx, g, { source: "nemotron-fast", model }, { readPicks: true, typedQuery, question });
 }
 
 export async function askGottawatch(deps: AskDeps, householdId: string, input: AskInput): Promise<AskResponse> {

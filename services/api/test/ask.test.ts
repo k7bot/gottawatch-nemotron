@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { AskResponse } from "@gottawatch/contract";
-import { askGottawatch, groundAnswer, heuristicFilter, heuristicMatch, looksLikeInjection, AGENT_TOOLS, NO_MATCH_ANSWER, OFF_TOPIC_ANSWER, type AskDeps } from "../src/domain/ask.js";
+import { askGottawatch, askedMaxRuntime, groundAnswer, heuristicFilter, heuristicMatch, looksLikeInjection, looksWatchRelated, AGENT_TOOLS, NO_MATCH_ANSWER, OFF_TOPIC_ANSWER, type AskDeps } from "../src/domain/ask.js";
 import { groupCandidates } from "../src/domain/tonight.js";
 import { makeAskHandler, ASK_LIMIT } from "../src/handlers/routes.js";
 import { demoCatalog } from "../src/catalog/index.js";
@@ -178,7 +178,6 @@ describe("Ask Gottawatch agent: recovery and attribution", () => {
     const s = rec(w.store, w.clock.now(), { title: "Saltwater Static", fromName: "Sam", runtime: 25, note: "dumb and delightful" });
     rec(w.store, w.clock.now(), { title: "Kestrel Bay", fromName: "Priya" });
     const { chat, calls } = scripted([
-      { toolCalls: [toolCall("get_watch_history")] },
       { content: '{"answer":"Nothing yet.","picks":[]}' },
       { toolCalls: [toolCall("get_friend_picks")] },
       { content: JSON.stringify({ answer: "Saltwater Static.", picks: [{ recId: s.recId, reason: "Sam loved it.", quotes: [] }] }) },
@@ -186,8 +185,27 @@ describe("Ask Gottawatch agent: recovery and attribution", () => {
     const res = await askGottawatch({ store: w.store, clock: w.clock.now, chat }, HH, { query: "anything", chips: [] });
     expect(res.source).toBe("nemotron-agent");
     expect(res.trace.some((t) => t.label === "nudge")).toBe(true);
-    expect(calls[2]!.json).toBe(false);
-    expect(calls[3]!.json).toBe(true);
+    expect(calls[1]!.json).toBe(false);
+    expect(calls[2]!.json).toBe(true);
+  });
+
+  it("a tool round that skips get_friend_picks gets it added, so the agent reads the picks before concluding", async () => {
+    const w = world();
+    const s = rec(w.store, w.clock.now(), { title: "Saltwater Static", fromName: "Sam", runtime: 25, genres: ["Comedy"], note: "dumb and delightful" });
+    const { chat, calls } = scripted([
+      { toolCalls: [toolCall("get_watch_history", { limit: 5 })] },
+      (req) => {
+        const assistant = req.messages.at(-3) as { role: string; tool_calls: { function: { name: string } }[] };
+        expect(assistant.tool_calls.map((t) => t.function.name)).toEqual(["get_watch_history", "get_friend_picks"]);
+        const picks = JSON.parse((req.messages.at(-1) as { content: string }).content);
+        expect(picks.titles.map((t: { title: string }) => t.title)).toEqual(["Saltwater Static"]);
+        return { content: JSON.stringify({ status: "ok", answer: "Sam's pick.", picks: [{ recId: s.recId, reason: "Sam loved it.", quotes: [] }] }) };
+      },
+    ]);
+    const res = AskResponse.parse(await askGottawatch({ store: w.store, clock: w.clock.now, chat }, HH, { query: "something short and funny for a weeknight", chips: [] }));
+    expect(res).toMatchObject({ status: "ok", source: "nemotron-agent", picks: [{ title: "Saltwater Static" }] });
+    expect(res.trace.some((t) => t.label === "friend picks")).toBe(true);
+    expect(calls).toHaveLength(2);
   });
 
   it("drops a reason that puts words in the mouth of a friend who left no note", () => {
@@ -222,8 +240,70 @@ describe("Ask Gottawatch: relevance (off topic, nothing fits)", () => {
     expect(res).toMatchObject({ status: "off_topic", answer: OFF_TOPIC_ANSWER, picks: [], source: "nemotron-agent" });
     expect(res.closest).toBeUndefined();
     expect(res.answer).not.toMatch(/Paris/);
-    expect(JSON.stringify(calls[1]!.messages.at(-1))).toMatch(/off_topic/);
+    expect(JSON.stringify(calls[1]!.messages.at(-1))).not.toMatch(/off_topic/); // the nudge no longer invites it
     expect(calls).toHaveLength(2); // no Nano call
+  });
+
+  it("regression (seen live): history only → no_match → nudge → off_topic is NOT accepted for a watch question", async () => {
+    const q = "something short and funny for a weeknight";
+    // The exact live sequence, as far as it can still happen: the agent concludes no_match without
+    // reading the picks, is nudged, then calls the question off topic. Nano answers instead.
+    const a = scripted([
+      { content: JSON.stringify({ status: "no_match", answer: "Nothing.", picks: [] }) },
+      { content: JSON.stringify({ status: "off_topic", answer: "", picks: [] }) },
+      { content: JSON.stringify({ status: "ok", answer: "Sam's pick is short and funny.", picks: [{ recId: ids.static, reason: "25 minutes, and Sam called it dumb and delightful.", quotes: ["dumb and delightful"] }] }) },
+    ]);
+    const ra = AskResponse.parse(await askGottawatch(deps(a.chat), HH, { query: q, chips: [] }));
+    expect(ra).toMatchObject({ status: "ok", source: "nemotron-fast", picks: [{ title: "Saltwater Static" }] });
+    expect(ra.trace.map((t) => t.label)).toEqual(expect.arrayContaining(["nudge", "off topic rejected"]));
+    expect(JSON.stringify(a.calls[1]!.messages.at(-1))).not.toMatch(/off_topic/);
+    expect(a.calls).toHaveLength(3);
+
+    // With a history-only tool round, the friend picks are added; an off_topic after that is still rejected.
+    const b = scripted([
+      { toolCalls: [toolCall("get_watch_history", { limit: 5 })] },
+      { content: JSON.stringify({ status: "off_topic", answer: "", picks: [] }) },
+      { content: JSON.stringify({ status: "ok", answer: "Try Sam's pick.", picks: [{ recId: ids.static, reason: "Short and funny.", quotes: [] }] }) },
+    ]);
+    expect(await askGottawatch(deps(b.chat), HH, { query: q, chips: [] })).toMatchObject({ status: "ok", source: "nemotron-fast" });
+
+    // If Nano also says off_topic, the rule-based fallback answers with picks (never off_topic).
+    const c = scripted([
+      { content: JSON.stringify({ status: "no_match", answer: "Nothing.", picks: [] }) },
+      { content: JSON.stringify({ status: "off_topic", answer: "", picks: [] }) },
+      { content: JSON.stringify({ status: "off_topic", answer: "", picks: [] }) },
+    ]);
+    const rc = AskResponse.parse(await askGottawatch(deps(c.chat), HH, { query: q, chips: [] }));
+    expect(rc).toMatchObject({ status: "ok", source: "fallback", picks: [{ title: "Saltwater Static" }] });
+  });
+
+  it("watch questions are recognised; trivia and chit-chat are not", () => {
+    for (const q of ["something short and funny for a weeknight", "what did Maya send", "anything for date night?", "a Korean horror movie from the 1980s", "Something we can all watch together", "we want to laugh"])
+      expect(looksWatchRelated(q)).toBe(true);
+    for (const q of ["What's the capital of France?", "what is 2+2", "asdf qwer", "tell me about yourself", "hello"]) expect(looksWatchRelated(q)).toBe(false);
+    expect(askedMaxRuntime("something short and funny")).toBe(45);
+    expect(askedMaxRuntime("under 30 minutes please")).toBe(30);
+    expect(askedMaxRuntime("something funny")).toBeUndefined();
+  });
+
+  it("'short' is respected: picks over the length are dropped when one fits, and an answer naming them is replaced", async () => {
+    const { chat } = scripted([
+      { toolCalls: [toolCall("get_friend_picks")] },
+      { content: JSON.stringify({ status: "ok", answer: "Try The Quiet Orchard or Saltwater Static.", picks: [
+        { recId: ids.orchard, reason: "Maya loved it.", quotes: [] },
+        { recId: ids.static, reason: "Sam called it dumb and delightful.", quotes: ["dumb and delightful"] },
+      ] }) },
+    ]);
+    const res = AskResponse.parse(await askGottawatch(deps(chat), HH, { query: "something short tonight", chips: [] }));
+    expect(res).toMatchObject({ status: "ok", source: "nemotron-agent", answer: "Try Saltwater Static.", picks: [{ title: "Saltwater Static" }] });
+    expect(res.picks).toHaveLength(1);
+    expect(res.trace.find((t) => t.label === "length")?.detail).toMatch(/The Quiet Orchard \(112 min\)/);
+    // Nothing fits the length: picks stay as chosen.
+    const only = scripted([
+      { toolCalls: [toolCall("get_friend_picks")] },
+      { content: JSON.stringify({ status: "ok", answer: "Maya's pick.", picks: [{ recId: ids.orchard, reason: "Maya loved it.", quotes: [] }] }) },
+    ]);
+    expect((await askGottawatch(deps(only.chat), HH, { query: "a quick romance", chips: [] })).picks.map((p) => p.title)).toEqual(["The Quiet Orchard"]);
   });
 
   it("nothing fits: agent reads the picks and says no_match → honest answer + closest, no Nano call", async () => {
