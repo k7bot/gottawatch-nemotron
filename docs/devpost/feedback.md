@@ -7,8 +7,8 @@ From building Ask Gottawatch over four days (Oct 26 to 30, 2026).
 - **OpenAI-compatible API.** A plain `fetch` to `/v1/chat/completions` with `tools` and `response_format` was all we
   needed. No SDK, no adapter layer, and our test transport could fake it exactly.
 - **Function calling on Nemotron 3 Super 120B** was reliable: in our eval it called the tool and returned grounded
-  JSON 5 of 5 times, about 2 s for both calls. Over 10 live questions it answered every one with grounded picks in
-  1.3 to 3.8 s, fast enough for a TV.
+  JSON 5 of 5 times, about 2 s for both calls. Over 10 questions against a local server it answered every one with
+  grounded picks in 1.3 to 3.8 s; on the live Cloud Run app most answers take 2 to 4 s, fast enough for a TV.
 - **Nemotron 3 Nano 30B** was the fastest model we tried (706 ms median on the pick task) and passed both tasks 5 of 5,
   which made it a good fast path and fallback.
 - **Price.** About 3K input and 500 output tokens per Ask on Super is roughly a tenth of a cent, so the hackathon credits
@@ -25,6 +25,9 @@ From building Ask Gottawatch over four days (Oct 26 to 30, 2026).
   round. A note in the function-calling docs about combining tools with JSON mode would help.
 - **The agent sometimes skipped the key tool.** Super occasionally read only watch history and answered with no picks.
   We added one nudge ("read the friend picks first"), which fixed it in live runs.
+- **Relevance status needs a server-side check too.** After reading only the watch history, Super once called
+  "something short and funny for a weeknight" off topic. We now add the friend-picks call to its first tool round and
+  never accept off topic for a question with watch words in it.
 - **Quote grounding needs a server-side check.** Nano sometimes wrote that a friend "says" something when that friend
   left no note. Nemotron 3.5 Lightning paraphrased quotes (1 of 5 on the grounded task) and, with reasoning on, ran to
   about 900 reasoning tokens and 13 s. We drop any pick whose quotes are not exact substrings of a friend's note.

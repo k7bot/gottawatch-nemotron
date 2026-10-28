@@ -2,7 +2,7 @@
 
 Friends recommend titles from their phones; your TV shows a lean-back living-room feed of those picks, suggests one **Tonight's pick** with a reason grounded only in your friends' own notes, and helps you get to the streaming app that has it.
 
-> **Baseline snapshot.** This commit is a scrubbed copy of Gottawatch as it stood on Oct 23, 2026 (originally built for the Amazon *Build, Ship, Shape* developer hackathon). Deployment config, judge/test credentials, account identifiers, app-store identifiers and the native phone app were removed. Everything after the `baseline-amazon-2026-10-23` tag is new work.
+> Started from a scrubbed baseline (tag `baseline-amazon-2026-10-23`): Gottawatch as it stood on Oct 23, 2026, originally built for the Amazon *Build, Ship, Shape* developer hackathon, with deployment config, judge/test credentials, account identifiers, app-store identifiers and the native phone app removed. Everything after that tag is new work for the Nebius x NVIDIA Global AI Hackathon ([what changed](docs/devpost/significant-updates.md)).
 
 ## Built with NVIDIA Nemotron on Nebius Token Factory
 
@@ -10,7 +10,7 @@ Friends recommend titles from their phones; your TV shows a lean-back living-roo
 https://gottawatch-752956741608.us-central1.run.app/tv/ (browser TV view). Judge sign-in is in the Devpost testing notes.
 
 **Ask Gottawatch** turns your friends' recommendations into a household concierge. Type or tap a mood
-("short and funny, both of us") on the phone, or pick a mood chip with the TV remote. A Nemotron agent reads
+("short and funny, both of us") on the phone, or on the TV pick a mood chip with the remote or "Type your own". A Nemotron agent reads
 what your friends sent, checks runtime, genre and what you've already watched, and answers with one to three
 picks. Every quote it shows is copied word for word from a friend's note, and the server checks that.
 
@@ -34,13 +34,14 @@ and their notes; optional runtime, type and genre filters), `get_title_details`,
 - any quoted text inside a reason or the answer must also come from a note, otherwise the pick or answer is dropped;
 - a reason that says a friend "said" or "mentioned" something is dropped when that friend left no note
   (we saw the fast model invent these in live runs);
-- if the agent answers without ever reading friend picks, it is sent back once to call `get_friend_picks`;
+- if the agent's tool round skips `get_friend_picks`, the server adds that call to the round; if it answers without ever reading friend picks, it is sent back once to call `get_friend_picks`;
+- when the question asks for something short (or "under N minutes"), picks over the length are dropped if a shorter one fits, and an answer promising a length a pick doesn't meet is replaced;
 - an answer that just repeats the question, or names a title it doesn't return, is replaced with a plain one.
 
 **Relevance.** Every answer has a `status`: `ok` (grounded picks), `no_match` (nothing your friends sent fits; the
 app says so and may show the closest pick, labeled "not an exact match") or `off_topic` (not a what-to-watch
 question; no picks). The model chooses it and the server checks it: `no_match` is only believed after the agent read
-the friend picks, `off_topic` only for typed questions, and `ok` needs at least one grounded pick. The rule-based
+the friend picks, `off_topic` only for typed questions that have no what-to-watch words in them ("something short and funny" never counts as off topic), and `ok` needs at least one grounded pick. The rule-based
 fallback returns `no_match` instead of everything when a typed question's filters (genre, movie or show, length)
 can't be met. Older clients that ignore `status` keep working (it defaults to `ok`).
 
@@ -61,9 +62,9 @@ drive the honest source label and the "How I picked this" drawer in the app.
 | Model eval, 5 runs each, median: Super 120B | pick 5/5 in 1075 ms; agent task 5/5 in 2028 ms |
 | Model eval: Nano 30B | pick 5/5 in 706 ms; agent task 5/5 in 1447 ms |
 | Model eval: Nemotron 3.5 Lightning (not used) | agent task 1/5, paraphrased quotes |
-| Local server, 10 real `/ask` calls | 10/10 answered by the agent with grounded picks, 1.3 to 3.8 s |
+| Local server (not live), 10 real `/ask` calls | 10/10 answered by the agent with grounded picks, 1.3 to 3.8 s |
 | `/tonight` with Nano | 0.9 to 1.2 s first call, cached after |
-| Live Cloud Run deployment | `/ask` 200 in 3.6 s with grounded friend quotes |
+| Live Cloud Run deployment (Oct 27, 17 ordinary questions) | grounded picks from the agent, usually 2 to 4 s (2.0 to 7.3 s); no_match / off_topic in about 1 to 2 s |
 
 **Run it locally with Nemotron:**
 
