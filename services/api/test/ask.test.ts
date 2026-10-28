@@ -298,6 +298,15 @@ describe("Ask Gottawatch: relevance (off topic, nothing fits)", () => {
     expect(res).toMatchObject({ status: "ok", source: "nemotron-agent", answer: "Try Saltwater Static.", picks: [{ title: "Saltwater Static" }] });
     expect(res.picks).toHaveLength(1);
     expect(res.trace.find((t) => t.label === "length")?.detail).toMatch(/The Quiet Orchard \(112 min\)/);
+    // An answer promising a length a pick doesn't meet is replaced with the plain one.
+    const promise = scripted([
+      { toolCalls: [toolCall("get_friend_picks")] },
+      { content: JSON.stringify({ status: "ok", answer: "Short picks under 30 minutes.", picks: [
+        { recId: ids.static, reason: "Sam called it dumb and delightful.", quotes: [] },
+        { recId: ids.kestrel, reason: "Priya says start at ep 2.", quotes: [] },
+      ] }) },
+    ]);
+    expect(await askGottawatch(deps(promise.chat), HH, { query: "something short", chips: [] })).toMatchObject({ answer: "Try Saltwater Static and Kestrel Bay.", picks: [{ title: "Saltwater Static" }, { title: "Kestrel Bay" }] });
     // Nothing fits the length: picks stay as chosen.
     const only = scripted([
       { toolCalls: [toolCall("get_friend_picks")] },

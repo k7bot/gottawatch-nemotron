@@ -476,6 +476,10 @@ function finish(ctx: Ctx, g: Grounded, base: Pick<AskResponse, "source" | "model
  * dropped title or counts the picks is replaced with the plain one.
  */
 function respectLength(ctx: Ctx, picks: AskPick[], answer: string | undefined, question: string): { picks: AskPick[]; answer: string | undefined } {
+  // An answer that promises a length some pick doesn't meet is replaced (measured live: "short comedy
+  // picks under 30 minutes" with a 40-minute drama among them).
+  const claimed = answer?.match(/\bunder (?:about )?(\d{1,3})\s*(?:min|minutes)\b/i);
+  if (claimed && picks.some((p) => p.runtime !== undefined && p.runtime > Number(claimed[1]))) answer = undefined;
   const max = askedMaxRuntime(question);
   if (!max) return { picks, answer };
   const fits = (p: AskPick) => p.runtime !== undefined && p.runtime <= max;
