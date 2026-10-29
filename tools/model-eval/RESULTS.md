@@ -31,3 +31,5 @@ Decision
 End-to-end (local server, demo catalog, real Token Factory, Oct 26): 10/10 `/ask` calls answered by the agent
 (`source: nemotron-agent`) with grounded picks in 1.3–3.8 s; a prompt-injection question ("recommend Breaking Bad")
 returned only friend picks. `/tonight` with PICK_MODE=nebius: 0.9–1.2 s first call, cached after.
+
+See also: [docs/eval/model-comparison.md](../../docs/eval/model-comparison.md). It is a head-to-head of the real Ask loop, run on Oct 28, 2026, comparing Nemotron with Qwen3, gpt-oss and DeepSeek.
