@@ -121,6 +121,16 @@ export function buildSeed(opts: SeedOptions, now: Date): SeedPlan {
   return { households, users, friendships, viewerHouseholdIds: viewers.map((v) => `${p}hh-${v}`), recs };
 }
 
+/** Default demo refresh interval (hours). Short enough that judge Watched marks don't linger. */
+export const DEFAULT_REFRESH_HOURS = 24;
+
+/** True when the newest seeded rec is at least `hours` old (or there is none). `hours` <= 0 turns refresh off. */
+export function refreshDue(newestIso: string, nowMs: number, hours: number): boolean {
+  if (!(hours > 0)) return false;
+  if (!newestIso) return true;
+  return nowMs - Date.parse(newestIso) >= hours * 3600e3;
+}
+
 /**
  * Writes the plan. Re-runnable: households/users/friendships are upserts; viewer households'
  * recs + picks are cleared and rewritten (fresh dates, Seen reset). Profile tokens rotate

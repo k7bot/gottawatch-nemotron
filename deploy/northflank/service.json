@@ -59,7 +59,7 @@
     "SNAPSHOT_FILE": "/data/state.json",
     "PICK_MODE": "nebius",
     "ASK_MODE": "nebius",
-    "DEMO_REFRESH_HOURS": "72",
+    "DEMO_REFRESH_HOURS": "24",
     "SEED_JUDGES": "1"
   },
   "healthChecks": [

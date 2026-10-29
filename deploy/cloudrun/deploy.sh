@@ -58,7 +58,7 @@ g run deploy "$SERVICE" --region "$REGION" --image "$IMAGE" --service-account "$
   --add-volume "name=data,type=cloud-storage,bucket=$BUCKET,mount-options=uid=1000;gid=1000" \
   --add-volume-mount "volume=data,mount-path=/data" \
   --set-secrets "NEBIUS_API_KEY=$SECRET:latest" \
-  --set-env-vars "STORE_MODE=file,SNAPSHOT_FILE=/data/state.json,PICK_MODE=nebius,ASK_MODE=nebius,DEMO_REFRESH_HOURS=72,SEED_JUDGES=1" \
+  --set-env-vars "STORE_MODE=file,SNAPSHOT_FILE=/data/state.json,PICK_MODE=nebius,ASK_MODE=nebius,DEMO_REFRESH_HOURS=24,SEED_JUDGES=1" \
   --startup-probe "httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=2,periodSeconds=5,failureThreshold=12,timeoutSeconds=3" \
   --liveness-probe "httpGet.path=/health,httpGet.port=8080,periodSeconds=30,failureThreshold=4,timeoutSeconds=5"
 

@@ -13,7 +13,7 @@ hosts the container and its state file.
 | Identity | Service account `gottawatch-run` with Secret Accessor on the secret and Object User on the bucket only |
 | Probes | Startup and liveness on `GET /health` |
 
-Env: `PICK_MODE=nebius`, `ASK_MODE=nebius`, `DEMO_REFRESH_HOURS=72`, `SEED_JUDGES=1` (plus the
+Env: `PICK_MODE=nebius`, `ASK_MODE=nebius`, `DEMO_REFRESH_HOURS=24`, `SEED_JUDGES=1` (plus the
 image defaults `PORT=8080`, `NODE_ENV=production`).
 
 ## Deploy

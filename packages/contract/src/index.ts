@@ -7,6 +7,10 @@ import { z } from "zod";
 export const PAIR_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export const PAIR_CODE_LENGTH = 6;
 export const NOTE_MAX = 120;
+/** Shared UI words for pairing, so the phone button, the /pair page and the TV's instructions all match. */
+export const CONNECT_TV_LABEL = "Connect a TV";
+export const TV_PAIR_STEP = `On your phone, open your Gottawatch link and choose ${CONNECT_TV_LABEL}`;
+export const TV_DISCONNECTED_BANNER = "This TV was disconnected. Connect it again to see your circle.";
 export const REASON_MAX = 220;
 export const CUSTOM_TITLE_MAX = 100;
 export const CUSTOM_TITLE_RAW_MAX = 300;

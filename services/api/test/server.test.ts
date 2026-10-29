@@ -142,3 +142,28 @@ describe("demo refresh keeps links valid", () => {
     expect(recs.every((r) => r.createdAt >= "2026-11-28")).toBe(true);
   });
 });
+
+import { DEFAULT_REFRESH_HOURS, refreshDue } from "../src/seed/seed.js";
+describe("demo refresh interval", () => {
+  const now = Date.parse("2026-12-05T12:00:00Z");
+  const hoursAgo = (h: number) => new Date(now - h * 3600e3).toISOString();
+  it("defaults to 24 hours so judge Watched marks reset within a day", () => {
+    expect(DEFAULT_REFRESH_HOURS).toBe(24);
+    expect(refreshDue(hoursAgo(23.9), now, DEFAULT_REFRESH_HOURS)).toBe(false);
+    expect(refreshDue(hoursAgo(24), now, DEFAULT_REFRESH_HOURS)).toBe(true);
+    expect(refreshDue(hoursAgo(30), now, DEFAULT_REFRESH_HOURS)).toBe(true);
+  });
+  it("refreshes an empty store and is off at 0", () => {
+    expect(refreshDue("", now, 24)).toBe(true);
+    expect(refreshDue(hoursAgo(1000), now, 0)).toBe(false);
+  });
+  it("Seen marks in the judge household are reset by a refresh", async () => {
+    const s = new MemoryStore(() => new Date());
+    await applySeed(s, buildSeed({ judges: 1 }, new Date("2026-12-04T12:00:00Z")));
+    const recs = await s.listRecs("hh-judge-1", { limit: 100 });
+    for (const r of recs) await s.putRec({ ...r, seen: true, seenAt: "2026-12-04T13:00:00Z" });
+    await applySeed(s, buildSeed({ judges: 1 }, new Date("2026-12-05T12:00:00Z")), { preserveTokens: true });
+    const after = await s.listRecs("hh-judge-1", { limit: 100 });
+    expect(after.filter((r) => !r.seen).length).toBe(13);
+  });
+});

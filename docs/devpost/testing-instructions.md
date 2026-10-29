@@ -41,4 +41,4 @@ pick a friend, and choose **Send**. The pick goes to that friend's TV, not to yo
 time. To unpair a TV, open the Me tab, tap ••• next to the TV, and choose Forget. Please don't leave the household in a changed state:
 - If you mark a title as "Watched it", tap **Undo** or use **Watched history › Put back**.
 - Ask allows 20 questions per household every 10 minutes.
-- The demo data resets on its own every 72 hours.
+- The demo data resets on its own every 24 hours, which also puts back anything marked as watched.

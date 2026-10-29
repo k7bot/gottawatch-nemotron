@@ -22,6 +22,6 @@ Total: 2:45. If a take runs long, cut the TV feed shot at 0:30–0:42 to 6 secon
 ## Before recording
 
 - Confirm `/health` returns `{"ok":true,...,"ask":"nebius"}` on the live URL.
-- Check the demo picks look recent (the demo refresh re-dates them every 72 hours).
+- Check the demo picks look recent (the demo refresh re-dates them every 24 hours).
 - If an answer shows the "fallback" source label, ask again; only record takes answered by Nemotron.
 - Captions: burn in the narration, since judges may watch muted.

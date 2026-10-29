@@ -20,6 +20,7 @@ import type { ToastState } from './screens/Toast';
 import { INFO_TOAST_MS, UNDO_TOAST_MS } from './core/home';
 import { useHomeData } from './screens/useHomeData';
 import { colors } from './ui/theme';
+import { TV_DISCONNECTED_BANNER } from '@gottawatch/contract';
 
 type Route =
   | { k: 'boot' }
@@ -40,7 +41,7 @@ interface Session {
   baseline?: number;
 }
 
-const UNPAIRED_BANNER = 'This TV was disconnected. Pair it again to see your circle.';
+const UNPAIRED_BANNER = TV_DISCONNECTED_BANNER;
 
 export default function GottawatchApp() {
   const envResult = useMemo(() => {

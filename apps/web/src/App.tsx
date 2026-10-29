@@ -1,4 +1,4 @@
-// Phone PWA (web-app.md, ux-design §6). Views: Home/search (+ Compose sheet, Sent), Pair a TV.
+// Phone PWA (web-app.md, ux-design §6). Views: Home/search (+ Compose sheet, Sent), Connect a TV (/pair).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiFailure, type ApiClient, type Me, type TitleRef } from './api';
 import { clearToken, readToken } from './token';
@@ -27,7 +27,7 @@ import {
   type HouseholdChoice,
   type RecentSend,
 } from './logic';
-import { NOTE_MAX } from '@gottawatch/contract';
+import { CONNECT_TV_LABEL, NOTE_MAX } from '@gottawatch/contract';
 import { BrandLockup } from './brand';
 import { EmailSignIn, useEmailEnabled } from './email';
 import { TOKEN_KEY } from './token';
@@ -614,7 +614,7 @@ function PairView({ api, session, initialCode, go }: { api: ApiClient; session: 
         <h1 className="display">Open your Gottawatch link first, then scan again.</h1>
         {isFullCode(fromQr) && <div className="bigcode" aria-label={`Code ${fromQr.split('').join(' ')}`}>{fromQr.slice(0, 3)} {fromQr.slice(3)}</div>}
         <p className="sub">
-          {session.k === 'invalid' ? "Your link doesn't work anymore. Ask the person who sent it for a new one." : 'Your personal link signs you in on this phone.'} After opening it, tap “Pair a TV” and type the code on your TV.
+          {session.k === 'invalid' ? "Your link doesn't work anymore. Ask the person who sent it for a new one." : 'Your personal link signs you in on this phone.'} After opening it, tap “{CONNECT_TV_LABEL}” and type the code from your TV.
         </p>
       </main>
     );
@@ -679,7 +679,7 @@ function PairView({ api, session, initialCode, go }: { api: ApiClient; session: 
 
   return (
     <main>
-      <h1 className="display">Pair a TV</h1>
+      <h1 className="display">{CONNECT_TV_LABEL}</h1>
       <p className="sub">The code is on your TV screen.</p>
       <div className="codeboxes" onClick={() => inputRef.current?.focus()}>
         {Array.from({ length: 6 }, (_, i) => (

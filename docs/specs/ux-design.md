@@ -184,7 +184,7 @@ Home  = Header + Spotlight (Tonight's pick by default) + "From your circle" row
 ```
 /u/<token>  ─► "Hi Priya" Home: search field (focused) + "Your recent sends"
    ├─ type ─► Results ─► tap ─► Compose sheet (optional note, recipients, where-to-watch) ─► Send ─► Sent ✓ ("On Kiran's TV within a minute")
-   └─ "Pair a TV" ─► Enter code (or arrive via QR: /pair?code=… ─► "Is this the code on your TV?") ─► Paired ✓
+   └─ "Connect a TV" ─► Enter code (or arrive via QR: /pair?code=… ─► "Is this the code on your TV?") ─► Paired ✓
 Invalid/expired link ─► friendly dead-end with "Ask Kiran for a new link"
 ```
 
@@ -245,7 +245,7 @@ Layout coordinates are approximate and **(proposed)**. Mockups: `tv-home-pick.pn
 | New rec arrives while open | Card appears with a "New" pill (slide-in is Tier 2); row count chip updates; Spotlight doesn't change unless that card has focus | unchanged |
 | Offline with data | Top-right banner (`surface-2`, `text`): "Offline · showing what we had · retrying" | unchanged |
 | Offline / error, no data | Full screen: "Can't reach WatchCircle" + "Check the TV's internet connection." + [Try again] | Try again |
-| Unpaired (401/403) | → Pairing, with a banner on Pairing: "This TV was disconnected. Pair it again to see your circle." | Get a code |
+| Unpaired (401/403) | → Pairing, with a banner on Pairing: "This TV was disconnected. Connect it again to see your circle." | Get a code |
 | Mock mode | `DEMO DATA` pill in header (§9) | n/a |
 
 **Return prompt (proposed, resolves part of OQ-06; Tier 2 per ADR-0009, item 1):** shown only when **all** of these hold (MF-7):
@@ -394,7 +394,7 @@ That's ≈ 6–8 s. Measured with a stopwatch on Kiran's phone, 5 runs, median <
 - **"How it'll look on their TV"**: a mini TV-card preview (poster + avatar + note). This is the delight moment, connecting phone to living room.
 - Buttons: [Recommend another] (primary), [Done].
 
-### 6.4 Pair a TV
+### 6.4 Connect a TV (/pair)
 
 - **Manual:** 6 large boxes, auto-uppercase, accepts lowercase/space/dash and strips them (R23 §6.1). Hint: "The code is on your TV screen."
 - **Via QR** (`/pair?code=K7Q4ZP`): "Is this the code on your TV?" + the code shown big + [Yes, connect this TV] + "No, that's not it". This follows R23 §3.3.1/§5.4.
@@ -456,7 +456,7 @@ That's ≈ 6–8 s. Measured with a stopwatch on Kiran's phone, 5 runs, median <
 | Empty | Your circle is quiet tonight · When a friend recommends something from their phone, it shows up here. · Refresh |
 | Offline banner | Offline · showing what we had · retrying |
 | Error | Can't reach WatchCircle · Check the TV's internet connection. · Try again |
-| Unpaired | This TV was disconnected. Pair it again to see your circle. |
+| Unpaired | This TV was disconnected. Connect it again to see your circle. |
 | First-run coach | Your friends' picks land here. Use Mark seen (or ☰ on a title) when you've watched something. · Got it |
 | Phone hello | Hi {name} · What should {household} watch? |
 | Phone search | Search a show or movie |

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { failureKind, type ApiClient, type Friend, type InviteItem, type FeedItem, type Home, type Me, type SeenItem, type SentItem } from './api';
 import { friendHue, groupInbox, initials, joinNames, posterAt, posterUrl, recommendLine, timeAgo, TMDB_NOTICE, JUSTWATCH_NOTICE, type HouseholdChoice, type InboxGroup } from './logic';
-import { serviceName, summarizeService } from '@gottawatch/contract';
+import { CONNECT_TV_LABEL, serviceName, summarizeService } from '@gottawatch/contract';
 import { EmailSection, useEmailEnabled } from './email';
 import { InviteSheet } from './invite';
 import { AskPanel } from './ask';
@@ -404,7 +404,7 @@ export function MeTab({ api, token, me, onPair, onSignOut, onEmailSaved }: { api
                 )}
               </div>
             ))}
-            <button className="btn small" onClick={onPair}>{home.v.tvs.length ? 'Connect another TV' : 'Connect a TV'}</button>
+            <button className="btn small" onClick={onPair}>{home.v.tvs.length ? 'Connect another TV' : CONNECT_TV_LABEL}</button>
           </div>
         )}
       </section>

@@ -117,7 +117,7 @@ docker run -p 8080:8080 -e NEBIUS_API_KEY -v gw-data:/data gottawatch
 | `SNAPSHOT_BUCKET` / `SNAPSHOT_KEY` / `S3_ENDPOINT` / `S3_REGION` | – / `gottawatch/store.json` / – / `us-north1` | `s3` mode, e.g. Nebius Object Storage `https://storage.us-north1.nebius.cloud` with `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. Seed links are written next to the snapshot object |
 | `PICK_MODE` / `ASK_MODE` | `nebius` when a key is set | `stub` / `off` to force the offline paths |
 | `SEED_ON_BOOT` / `SEED_JUDGES` | `1` / `1` | Seeds the demo circle + N judge households when the store is empty |
-| `DEMO_REFRESH_HOURS` | `72` | Re-dates the demo recs when they go stale. Keeps every link valid but resets judge Seen marks and sends |
+| `DEMO_REFRESH_HOURS` | `24` | Re-dates the demo recs when they go stale. Keeps every link valid but resets judge Seen marks and sends |
 
 Local without Docker: `npm run serve -w services/api` after building `apps/web` (`VITE_API_URL=same-origin`) and
 the TV export (`cd apps/tv && EXPO_PUBLIC_API_URL=same-origin scripts/export-web.sh`).

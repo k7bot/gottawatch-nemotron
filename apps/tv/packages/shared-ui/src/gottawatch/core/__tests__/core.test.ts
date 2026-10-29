@@ -374,3 +374,14 @@ describe('Ask on the TV', () => {
     expect(JSON.parse(String(init.body))).toEqual({ query: '', chips: ['light'] });
   });
 });
+
+import { readFileSync } from 'node:fs';
+describe('pairing words match the phone', () => {
+  it("the pairing screen tells you to choose 'Connect a TV' and never says 'Pair a TV'", () => {
+    const screen = readFileSync(new URL('../../screens/PairingScreen.tsx', import.meta.url), 'utf8');
+    const app = readFileSync(new URL('../../GottawatchApp.tsx', import.meta.url), 'utf8');
+    expect(screen).toContain('`1 · ${TV_PAIR_STEP}`');
+    expect(app).toContain('const UNPAIRED_BANNER = TV_DISCONNECTED_BANNER;');
+    expect(screen + app).not.toMatch(/Pair a TV|Pair it again|Pair this TV/);
+  });
+});

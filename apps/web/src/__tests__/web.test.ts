@@ -213,3 +213,16 @@ describe('Ask Gottawatch', () => {
     await expect(new MockApiClient('ask-limit', 0).ask(TOKEN, 'x', [])).rejects.toMatchObject({ kind: 'rate_limited' });
   });
 });
+
+import { readFileSync } from 'node:fs';
+import { CONNECT_TV_LABEL } from '@gottawatch/contract';
+describe('pairing words match the TV', () => {
+  it("the Me tab button and the /pair title both say 'Connect a TV'", () => {
+    const app = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
+    const tabs = readFileSync(new URL('../tabs.tsx', import.meta.url), 'utf8');
+    expect(CONNECT_TV_LABEL).toBe('Connect a TV');
+    expect(app).toContain('<h1 className="display">{CONNECT_TV_LABEL}</h1>');
+    expect(tabs).toContain(": CONNECT_TV_LABEL}");
+    expect(app + tabs).not.toContain('Pair a TV');
+  });
+});

@@ -87,3 +87,13 @@ describe("services (ADR-0012)", () => {
     expect(summarizeService([])).toBeNull();
   });
 });
+
+import { CONNECT_TV_LABEL, TV_PAIR_STEP, TV_DISCONNECTED_BANNER } from "../src/index.js";
+describe("pairing words (phone and TV say the same thing)", () => {
+  it("uses 'Connect a TV' everywhere", () => {
+    expect(CONNECT_TV_LABEL).toBe("Connect a TV");
+    expect(TV_PAIR_STEP).toBe("On your phone, open your Gottawatch link and choose Connect a TV");
+    expect(TV_DISCONNECTED_BANNER).toContain("Connect it again");
+    for (const s of [TV_PAIR_STEP, TV_DISCONNECTED_BANNER]) expect(s).not.toMatch(/\bPair\b/);
+  });
+});

@@ -5,7 +5,8 @@
 //   CATALOG_MODE demo (default here)  PICK_MODE stub|nebius (default here: nebius when NEBIUS_API_KEY is set)
 //   ASK_MODE nebius|off  NEBIUS_API_KEY
 //   SEED_ON_BOOT (1) seeds the demo personas into an empty store; SEED_JUDGES (1) judge households;
-//   DEMO_REFRESH_HOURS (72) re-dates the demo recs so they never age out during judging (0 = off).
+//   DEMO_REFRESH_HOURS (24) re-dates the demo recs and resets judge Watched marks, so they never age out
+//   and one judge marking everything watched does not empty the feed for long (0 = off).
 // Plaintext profile links exist only at seed time; they go to SEED_LINKS_FILE (mode 600) or, with
 // STORE_MODE=s3, to a private object next to the snapshot. They are never logged.
 import { createServer } from "node:http";
@@ -13,7 +14,7 @@ import { access, constants, mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { askFromEnv, catalogFromEnv, mailerFromEnv, pickerFromEnv, type AppDeps } from "../lib/deps.js";
 import { systemClock } from "../lib/time.js";
-import { applySeed, buildSeed, type SeedLink } from "../seed/seed.js";
+import { applySeed, buildSeed, DEFAULT_REFRESH_HOURS, refreshDue, type SeedLink } from "../seed/seed.js";
 import { backendFromEnv, openPersistedStore, type SnapshotBackend } from "../persist/snapshot.js";
 import { makeApiDispatcher } from "./router.js";
 import { createRequestListener } from "./app.js";
@@ -80,12 +81,12 @@ if (env.SEED_ON_BOOT !== "0" && persisted.memory.users.size === 0) {
 
 // Scheduled refresh: re-date the demo recs (tokens and paired TVs stay valid) when the newest
 // seeded rec for Kiran is older than DEMO_REFRESH_HOURS, so judges always see a fresh evening.
-const refreshHours = Number(env.DEMO_REFRESH_HOURS ?? 72);
+const refreshHours = Number(env.DEMO_REFRESH_HOURS ?? DEFAULT_REFRESH_HOURS);
 async function maybeRefresh() {
   if (!refreshHours || env.SEED_ON_BOOT === "0") return;
   const recs = await store.listRecs("hh-kiran", { limit: 200 });
   const newest = recs.reduce((m, r) => (r.createdAt > m ? r.createdAt : m), "");
-  if (newest && Date.now() - Date.parse(newest) < refreshHours * 3600e3) return;
+  if (!refreshDue(newest, Date.now(), refreshHours)) return;
   const { links } = await applySeed(store, buildSeed({ judges }, new Date()), { preserveTokens: true });
   await writeLinks(links, backend);
   log(`seed: demo recs refreshed (older than ${refreshHours}h)`);

@@ -25,7 +25,7 @@ costs $0: the Sandbox is free, needs no card and doesn't sleep. The AI calls use
 | `STORE_MODE` / `SNAPSHOT_FILE` | `file` / `/data/state.json` | the volume path |
 | `PICK_MODE` | `nebius` | Tonight's pick from Nemotron Nano (falls back to deterministic) |
 | `ASK_MODE` | `nebius` | Ask: Super → Nano → heuristic |
-| `DEMO_REFRESH_HOURS` | `72` | re-dates demo recs so they stay fresh through judging (0 = off) |
+| `DEMO_REFRESH_HOURS` | `24` | re-dates demo recs so they stay fresh through judging (0 = off) |
 | `SEED_JUDGES` | `1` | judge households seeded on first boot |
 | `WEB_ORIGIN` | optional | only used in emailed invite links |
 

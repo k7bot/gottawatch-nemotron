@@ -13,6 +13,7 @@ import { QrCode } from '../ui/QrCode';
 import { colors, fonts, px, type } from '../ui/theme';
 import { useBack } from '../ui/keys';
 import { Screen } from './Common';
+import { TV_PAIR_STEP } from '@gottawatch/contract';
 
 type Phase =
   | { k: 'intro' }
@@ -116,7 +117,7 @@ export function PairingScreen({ api, config, deviceId, banner, showIntro, onPair
           <View style={{ flex: 1, paddingHorizontal: px(96), justifyContent: 'center' }}>
             <Wordmark size={56} />
             <Text style={[type.display, { marginTop: px(48), maxWidth: px(1300) }]}>Your friends' recommendations, on the big screen</Text>
-            <Text style={[type.body, { marginTop: px(24), maxWidth: px(900) }]}>Pair this TV with your phone once. It takes about a minute.</Text>
+            <Text style={[type.body, { marginTop: px(24), maxWidth: px(900) }]}>Connect this TV to your phone once. It takes about a minute.</Text>
             <View style={{ flexDirection: 'row', marginTop: px(56) }}>
               <SpatialNavigationNode orientation="horizontal">
                 <DefaultFocus>
@@ -149,7 +150,7 @@ export function PairingScreen({ api, config, deviceId, banner, showIntro, onPair
                   1 · On your phone, scan the code or open <Text style={{ color: colors.text, fontFamily: fonts.semibold }}>{shortUrl}</Text>
                 </>
               ) : (
-                '1 · On your phone, open your Gottawatch link and choose Pair a TV'
+                `1 · ${TV_PAIR_STEP}`
               )}
             </Text>
             <Text style={[type.body, { marginTop: px(8) }]}>2 · Enter this code</Text>
