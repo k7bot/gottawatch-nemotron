@@ -68,5 +68,5 @@ React Native, Docker, Google Cloud Run.
 ## Try it
 
 - Live demo: https://gottawatch-752956741608.us-central1.run.app (TV view: `/tv/`)
-- Judge sign-in: see the testing notes (private link)
+- Judge sign-in and TV pairing: see the testing instructions (the sign-in link is private)
 - Code: https://github.com/k7bot/gottawatch-nemotron (MIT)
