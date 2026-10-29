@@ -34,7 +34,8 @@ account identifiers, credentials and judge codes.
 | Relevance status | Every answer is `ok`, `no_match` (nothing your friends sent fits; say so, optionally with the closest pick) or `off_topic` (friendly redirect, no picks); the server checks the model's status, and the rule-based fallback returns `no_match` when a typed question's filters can't be met | `edd0828`, `8b9f142`, `a83e03f` |
 | TV typed input | "Type your own…" on the TV Ask screen with the on-screen keyboard; focus stays on it after a no-match or off-topic answer so you can rephrase | `81a774b`, `19d1a18`, `db0ab78` |
 | Off-topic handling | Injection attempts are redirected before any model call; a what-to-watch question is never accepted as off topic (seen live after a nudge); the server adds `get_friend_picks` when the agent's tool round skips it; the nudge no longer invites off topic; "short" / "under N minutes" drops picks over the length when one fits | `60f327c`, `7cd3f70` |
+| Judge readiness | Demo data refreshes every 24 hours (was 72), which also puts back anything a judge marked as watched; the phone button, the `/pair` page and the TV's pairing steps all say "Connect a TV" (one shared string) | `deeec4d` |
 
 Size of the change since the tag (as of `7cd3f70`): 107 files changed, 4,642 lines added, 210 removed. Of that,
 the API source is 1,588 added lines (most of it the Ask agent, Token Factory client, persistence and server) and
-1,005 lines of new tests. Test counts now: contract 10, API 147, web 33, TV 43, all passing.
+1,005 lines of new tests. Test counts now: contract 11, API 150, web 34, TV 44, all passing.
